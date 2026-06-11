@@ -424,6 +424,11 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
     private void setVideoView() {
         mBinding.control.action.danmaku.setVisibility(DanmakuSetting.isLoad() ? View.VISIBLE : View.GONE);
         mBinding.control.action.reset.setText(ResUtil.getStringArray(R.array.select_reset)[Setting.getReset()]);
+        setPlayer();
+    }
+
+    private void setPlayer() {
+        mBinding.control.action.player.setText(service() == null ? ResUtil.getStringArray(R.array.select_player)[PlayerSetting.getPlayer()] : player().getPlayerText());
     }
 
     private int getEpisodeColumn() {
@@ -1022,8 +1027,19 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
     }
 
     private void onChoose() {
-        PlayerHelper.choose(this, player().getUrl(), player().getHeaders(), player().isVod(), player().getPosition(), mBinding.widget.title.getText());
-        setRedirect(true);
+        String[] items = new String[]{"EXO", "IJK", "外调"};
+        new androidx.appcompat.app.AlertDialog.Builder(this).setItems(items, (dialog, which) -> {
+            if (which == 0) {
+                player().switchPlayer(PlayerSetting.EXO);
+                setPlayer();
+            } else if (which == 1) {
+                player().switchPlayer(PlayerSetting.IJK);
+                setPlayer();
+            } else {
+                PlayerHelper.choose(this, player().getUrl(), player().getHeaders(), player().isVod(), player().getPosition(), mBinding.widget.title.getText());
+                setRedirect(true);
+            }
+        }).show();
     }
 
     private void onDecode() {

@@ -399,6 +399,11 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
         mBinding.control.action.danmaku.setVisibility(DanmakuSetting.isLoad() ? View.VISIBLE : View.GONE);
         mBinding.control.action.reset.setText(ResUtil.getStringArray(R.array.select_reset)[Setting.getReset()]);
         mBinding.video.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> mPiP.update(this, view));
+        setPlayer();
+    }
+
+    private void setPlayer() {
+        mBinding.control.action.player.setText(service() == null ? ResUtil.getStringArray(R.array.select_player)[PlayerSetting.getPlayer()] : player().getPlayerText());
     }
 
     private void setVideoView(boolean isInPictureInPictureMode) {
@@ -907,8 +912,19 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
     }
 
     private void onChoose() {
-        PlayerHelper.choose(this, player().getUrl(), player().getHeaders(), player().isVod(), player().getPosition(), mBinding.control.title.getText());
-        setRedirect(true);
+        String[] items = new String[]{"EXO", "IJK", "外调"};
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this).setItems(items, (dialog, which) -> {
+            if (which == 0) {
+                player().switchPlayer(PlayerSetting.EXO);
+                setPlayer();
+            } else if (which == 1) {
+                player().switchPlayer(PlayerSetting.IJK);
+                setPlayer();
+            } else {
+                PlayerHelper.choose(this, player().getUrl(), player().getHeaders(), player().isVod(), player().getPosition(), mBinding.control.title.getText());
+                setRedirect(true);
+            }
+        }).show();
     }
 
     private boolean onTextLong() {
