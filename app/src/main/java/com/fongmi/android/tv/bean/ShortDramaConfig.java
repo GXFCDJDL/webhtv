@@ -44,17 +44,17 @@ public class ShortDramaConfig {
 
     public boolean isSiteEnabled(String key, String name) {
         sanitize();
-        List<String> rules = isConfigured() ? getEnabledSites() : DEFAULT_ENABLED_RULES;
+        List<String> rules = !enabledSites.isEmpty() ? enabledSites : DEFAULT_ENABLED_RULES;
         return matches(rules, key) || matches(rules, name);
     }
 
     public String getDisplayRules() {
-        List<String> rules = isConfigured() ? getEnabledSites() : DEFAULT_ENABLED_RULES;
+        List<String> rules = !getEnabledSites().isEmpty() ? getEnabledSites() : DEFAULT_ENABLED_RULES;
         return rules.isEmpty() ? "" : String.join(";", rules);
     }
 
     public String getDisplayRulesWithNames() {
-        List<String> rules = isConfigured() ? getEnabledSites() : DEFAULT_ENABLED_RULES;
+        List<String> rules = !getEnabledSites().isEmpty() ? getEnabledSites() : DEFAULT_ENABLED_RULES;
         if (rules.isEmpty()) return "";
         List<String> display = new ArrayList<>();
         for (String rule : rules) {
