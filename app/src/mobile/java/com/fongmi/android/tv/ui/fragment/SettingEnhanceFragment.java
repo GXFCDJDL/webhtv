@@ -71,7 +71,7 @@ public class SettingEnhanceFragment extends BaseFragment {
 
     private void setText() {
         mBinding.driveCheckText.setText(getSwitch(Setting.isDriveCheck()));
-        mBinding.audioSourceText.setText(AudioConfig.objectFrom(Setting.getAudioConfig()).getDisplayRulesWithNames());
+        mBinding.audioSourceText.setText(getSwitch(!AudioConfig.objectFrom(Setting.getAudioConfig()).getDisplayRules().isEmpty()));
         mBinding.debugLogText.setText(getSwitch(Setting.isDebugLog()));
         mBinding.siteHealthSortText.setText(getSwitch(Setting.isSiteHealthSort()));
         WebHomeExtensionRegistry.Snapshot webHomeExtension = WebHomeExtensionRegistry.get().snapshot();
