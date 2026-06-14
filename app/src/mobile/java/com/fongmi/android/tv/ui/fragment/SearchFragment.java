@@ -2,9 +2,14 @@ package com.fongmi.android.tv.ui.fragment;
 
 import static androidx.fragment.app.FragmentTransaction.TRANSIT_FRAGMENT_OPEN;
 
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextUtils;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -12,10 +17,14 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
+import android.widget.PopupWindow;
+import android.widget.ScrollView;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.LinearLayoutCompat;
 import androidx.core.view.MenuProvider;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
@@ -24,6 +33,8 @@ import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.R;
+import com.fongmi.android.tv.api.config.VodConfig;
+import com.fongmi.android.tv.bean.Site;
 import com.fongmi.android.tv.bean.Word;
 import com.fongmi.android.tv.databinding.FragmentSearchBinding;
 import com.fongmi.android.tv.impl.Callback;
@@ -33,11 +44,14 @@ import com.fongmi.android.tv.ui.adapter.WordAdapter;
 import com.fongmi.android.tv.ui.base.BaseFragment;
 import com.fongmi.android.tv.ui.custom.CustomTextListener;
 import com.fongmi.android.tv.ui.dialog.SiteDialog;
+import com.fongmi.android.tv.utils.Notify;
+import com.fongmi.android.tv.utils.ResUtil;
 import com.fongmi.android.tv.utils.SearchSuggest;
 import com.fongmi.android.tv.utils.Util;
 import com.github.catvod.net.OkHttp;
 import com.google.android.flexbox.FlexDirection;
 import com.google.android.flexbox.FlexboxLayoutManager;
+import com.google.android.material.textview.MaterialTextView;
 import com.google.common.net.HttpHeaders;
 
 import java.io.IOException;
@@ -51,9 +65,18 @@ import okhttp3.Response;
 
 public class SearchFragment extends BaseFragment implements MenuProvider, WordAdapter.OnClickListener, RecordAdapter.OnClickListener {
 
+    private static final int MENU_SCOPE_ALL = 1;
+    private static final int MENU_SCOPE_CURRENT = 2;
+    private static final int MENU_SCOPE_GROUP_OFFSET = 100;
+    private static final int SCOPE_POPUP_ITEM_HEIGHT = 44;
+    private static final int SCOPE_POPUP_MAX_ITEMS = 8;
+
     private FragmentSearchBinding mBinding;
     private RecordAdapter mRecordAdapter;
     private WordAdapter mWordAdapter;
+    private PopupWindow scopePopup;
+    private String mGroup = "";
+    private boolean mCurrentSite;
     private List<Word.Data> mIqiyiWords = new ArrayList<>();
     private List<Word.Data> mTencentWords = new ArrayList<>();
     private int mSuggestSeq;
@@ -76,7 +99,12 @@ public class SearchFragment extends BaseFragment implements MenuProvider, WordAd
     }
 
     private String getSiteKey() {
-        return getArguments().getString("siteKey");
+        String siteKey = getArguments().getString("siteKey");
+        return siteKey == null ? "" : siteKey;
+    }
+
+    private Site getHome() {
+        return VodConfig.get().getHome();
     }
 
     private boolean empty() {
@@ -100,6 +128,8 @@ public class SearchFragment extends BaseFragment implements MenuProvider, WordAd
 
     @Override
     protected void initView() {
+        mCurrentSite = !TextUtils.isEmpty(getSiteKey());
+        mGroup = "";
         setRecyclerView();
         checkKeyword();
         search();
@@ -158,9 +188,18 @@ public class SearchFragment extends BaseFragment implements MenuProvider, WordAd
         if (fm.findFragmentByTag(collectTag) != null) return;
         String searchTag = SearchFragment.class.getSimpleName();
         FragmentTransaction ft = fm.beginTransaction().setTransition(TRANSIT_FRAGMENT_OPEN);
-        ft.add(R.id.container, CollectFragment.newInstance(keyword, getSiteKey()), collectTag);
+        ft.add(R.id.container, CollectFragment.newInstance(keyword, getSearchSiteKey(), getSearchGroup()), collectTag);
         Optional.ofNullable(fm.findFragmentByTag(searchTag)).ifPresent(ft::hide);
         ft.setReorderingAllowed(true).addToBackStack(null).commit();
+    }
+
+    private String getSearchSiteKey() {
+        if (!mCurrentSite) return "";
+        return TextUtils.isEmpty(getSiteKey()) ? getHome().getKey() : getSiteKey();
+    }
+
+    private String getSearchGroup() {
+        return mCurrentSite ? "" : mGroup;
     }
 
     private void getWord(String text) {
@@ -228,6 +267,100 @@ public class SearchFragment extends BaseFragment implements MenuProvider, WordAd
         mBinding.keyword.post(() -> SiteDialog.create().search().show(this));
     }
 
+    private void onScope() {
+        View anchor = mBinding.toolbar.findViewById(R.id.action_scope);
+        if (anchor == null) return;
+        List<String> groups = Site.getGroups(VodConfig.get().getSites());
+        int width = getScopePopupWidth(groups);
+        int height = getScopePopupHeight(groups.size() + 2);
+        ScrollView scroll = new ScrollView(requireContext());
+        LinearLayoutCompat content = new LinearLayoutCompat(requireContext());
+        content.setOrientation(LinearLayoutCompat.VERTICAL);
+        content.setPadding(0, ResUtil.dp2px(6), 0, ResUtil.dp2px(6));
+        content.setBackground(getScopePopupBackground());
+        scroll.setFillViewport(false);
+        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        scroll.addView(content, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        addScopePopupItem(content, getString(R.string.search_scope_all), MENU_SCOPE_ALL, groups);
+        addScopePopupItem(content, getString(R.string.search_scope_current), MENU_SCOPE_CURRENT, groups);
+        for (int i = 0; i < groups.size(); i++) addScopePopupItem(content, groups.get(i), MENU_SCOPE_GROUP_OFFSET + i, groups);
+        scopePopup = new PopupWindow(scroll, width, height, true);
+        scopePopup.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        scopePopup.setOutsideTouchable(true);
+        scopePopup.setElevation(ResUtil.dp2px(6));
+        scopePopup.showAsDropDown(anchor, anchor.getWidth() - width, 0);
+    }
+
+    private GradientDrawable getScopePopupBackground() {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(Color.WHITE);
+        drawable.setCornerRadius(ResUtil.dp2px(6));
+        return drawable;
+    }
+
+    private int getScopePopupWidth(List<String> groups) {
+        int width = Math.max(ResUtil.getTextWidth(getString(R.string.search_scope_all), 16), ResUtil.getTextWidth(getString(R.string.search_scope_current), 16));
+        for (String group : groups) width = Math.max(width, ResUtil.getTextWidth(group, 16));
+        int contentWidth = width + ResUtil.dp2px(36);
+        int maxWidth = ResUtil.getScreenWidth(requireContext()) - ResUtil.dp2px(32);
+        return Math.min(contentWidth, maxWidth);
+    }
+
+    private int getScopePopupHeight(int itemCount) {
+        int itemHeight = ResUtil.dp2px(SCOPE_POPUP_ITEM_HEIGHT);
+        int padding = ResUtil.dp2px(12);
+        int contentHeight = itemCount * itemHeight + padding;
+        int maxHeight = Math.min(ResUtil.getScreenHeight(requireContext()) - mBinding.toolbar.getHeight() - ResUtil.dp2px(32), SCOPE_POPUP_MAX_ITEMS * itemHeight + padding);
+        return Math.min(contentHeight, Math.max(itemHeight + padding, maxHeight));
+    }
+
+    private void addScopePopupItem(LinearLayoutCompat content, String text, int itemId, List<String> groups) {
+        MaterialTextView view = new MaterialTextView(requireContext());
+        view.setText(text);
+        view.setSingleLine(true);
+        view.setGravity(Gravity.CENTER_VERTICAL);
+        view.setIncludeFontPadding(false);
+        view.setTextColor(0xFF202124);
+        view.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        view.setPadding(ResUtil.dp2px(18), 0, ResUtil.dp2px(18), 0);
+        view.setBackgroundResource(getSelectableItemBackground());
+        view.setOnClickListener(v -> {
+            if (scopePopup != null) scopePopup.dismiss();
+            onScopeSelected(itemId, groups);
+        });
+        content.addView(view, new LinearLayoutCompat.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ResUtil.dp2px(SCOPE_POPUP_ITEM_HEIGHT)));
+    }
+
+    private int getSelectableItemBackground() {
+        TypedValue value = new TypedValue();
+        requireContext().getTheme().resolveAttribute(android.R.attr.selectableItemBackground, value, true);
+        return value.resourceId;
+    }
+
+    private boolean onScopeSelected(int itemId, List<String> groups) {
+        if (itemId == MENU_SCOPE_ALL) {
+            mCurrentSite = false;
+            mGroup = "";
+        } else if (itemId == MENU_SCOPE_CURRENT) {
+            Site site = getHome();
+            if (site.isEmpty() || !site.isSearchable()) {
+                Notify.show(R.string.detail_site_not_searchable);
+                return true;
+            }
+            mCurrentSite = true;
+            mGroup = "";
+            Notify.show(getString(R.string.search_scope_current_hint, site.getName()));
+        } else if (itemId >= MENU_SCOPE_GROUP_OFFSET) {
+            int index = itemId - MENU_SCOPE_GROUP_OFFSET;
+            if (index < 0 || index >= groups.size()) return true;
+            mCurrentSite = false;
+            mGroup = groups.get(index);
+            Notify.show(getString(R.string.search_scope_group_hint, mGroup));
+        }
+        requireActivity().invalidateOptionsMenu();
+        return true;
+    }
+
     @Override
     public void onItemClick(String text) {
         setKeyword(text);
@@ -249,12 +382,23 @@ public class SearchFragment extends BaseFragment implements MenuProvider, WordAd
     @Override
     public void onPrepareMenu(@NonNull Menu menu) {
         menu.findItem(R.id.action_reset).setVisible(!empty());
+        menu.findItem(R.id.action_scope).setTitle(mCurrentSite ? getString(R.string.search_scope_current) : TextUtils.isEmpty(mGroup) ? getString(R.string.search_scope_all) : mGroup);
+        tintToolbarActionText(R.id.action_scope);
+    }
+
+    private void tintToolbarActionText(int id) {
+        ViewGroup toolbar = mBinding.toolbar;
+        toolbar.post(() -> {
+            View action = toolbar.findViewById(id);
+            if (action instanceof TextView textView) textView.setTextColor(Color.WHITE);
+        });
     }
 
     @Override
     public boolean onMenuItemSelected(@NonNull MenuItem menuItem) {
         if (menuItem.getItemId() == android.R.id.home) requireActivity().getOnBackPressedDispatcher().onBackPressed();
         if (menuItem.getItemId() == R.id.action_reset) onReset();
+        if (menuItem.getItemId() == R.id.action_scope) onScope();
         if (menuItem.getItemId() == R.id.action_site) onSite();
         return true;
     }
@@ -268,6 +412,8 @@ public class SearchFragment extends BaseFragment implements MenuProvider, WordAd
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        if (scopePopup != null) scopePopup.dismiss();
+        scopePopup = null;
         requireActivity().removeMenuProvider(this);
     }
 }

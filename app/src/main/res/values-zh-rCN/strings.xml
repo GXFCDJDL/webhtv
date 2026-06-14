@@ -608,10 +608,13 @@
 
     <!-- SEARCH -->
     <string name="search_scope_all">全部</string>
+    <string name="search_scope_current">当前站</string>
+    <string name="search_scope_current_hint">当前站：%1$s</string>
     <string name="search_scope_group_hint">分组：%1$s</string>
     <string name="search_result_all">%1$s 的搜索结果</string>
     <string name="search_result_current">当前站搜索：%1$s</string>
     <string name="search_result_group">%1$s 搜索：%2$s</string>
+    <string name="detail_site_not_searchable">当前站源不支持搜索</string>
 
     <string-array name="select_decode">
         <item>软解</item>

@@ -5,9 +5,13 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
+import android.widget.LinearLayout;
+import android.widget.PopupWindow;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
@@ -15,6 +19,8 @@ import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.R;
+import com.fongmi.android.tv.api.config.VodConfig;
+import com.fongmi.android.tv.bean.Site;
 import com.fongmi.android.tv.bean.Word;
 import com.fongmi.android.tv.databinding.ActivitySearchBinding;
 import com.fongmi.android.tv.impl.Callback;
@@ -26,6 +32,8 @@ import com.fongmi.android.tv.ui.custom.CustomKeyboard;
 import com.fongmi.android.tv.ui.custom.CustomTextListener;
 import com.fongmi.android.tv.ui.dialog.SiteDialog;
 import com.fongmi.android.tv.utils.KeyUtil;
+import com.fongmi.android.tv.utils.Notify;
+import com.fongmi.android.tv.utils.ResUtil;
 import com.fongmi.android.tv.utils.SearchSuggest;
 import com.fongmi.android.tv.utils.Util;
 import com.fongmi.android.tv.utils.ZhuToPin;
@@ -49,6 +57,8 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
     private WordAdapter mWordAdapter;
     private List<Word.Data> mIqiyiWords = new ArrayList<>();
     private List<Word.Data> mTencentWords = new ArrayList<>();
+    private String mScopeGroup = "";
+    private boolean mCurrentSite;
     private int mSuggestSeq;
 
     public static void start(Activity activity) {
@@ -67,7 +77,7 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
     }
 
     public static void direct(Activity activity, String keyword) {
-        CollectActivity.start(activity, keyword);
+        CollectActivity.start(activity, keyword, null);
     }
 
     private String getKeyword() {
@@ -76,7 +86,12 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
     }
 
     private String getSiteKey() {
-        return getIntent().getStringExtra("siteKey");
+        String siteKey = getIntent().getStringExtra("siteKey");
+        return siteKey != null ? siteKey : "";
+    }
+
+    private Site getHome() {
+        return VodConfig.get().getHome();
     }
 
     private boolean empty() {
@@ -90,9 +105,11 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
 
     @Override
     protected void initView(Bundle savedInstanceState) {
+        mCurrentSite = !TextUtils.isEmpty(getSiteKey());
         CustomKeyboard.init(this, mBinding);
         setRecyclerView();
         checkKeyword();
+        setSearchScope();
         onSearch();
     }
 
@@ -109,6 +126,11 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
             }
         });
         mBinding.mic.setOnClickListener(v -> mBinding.mic.start());
+        mBinding.searchScope.setOnClickListener(v -> onScope());
+        mBinding.searchScope.setOnLongClickListener(v -> {
+            showScopeMenu(v);
+            return true;
+        });
         mBinding.mic.setListener(this, new CustomTextListener() {
             @Override
             public void onResults(String result) {
@@ -212,7 +234,74 @@ public class SearchActivity extends BaseActivity implements WordAdapter.OnClickL
         String keyword = mBinding.keyword.getText().toString().trim();
         App.post(() -> mRecordAdapter.add(keyword), 250);
         Util.hideKeyboard(mBinding.keyword);
-        CollectActivity.start(this, keyword, getSiteKey());
+        CollectActivity.start(this, keyword, getSearchSiteKey(), mScopeGroup);
+    }
+
+    private String getSearchSiteKey() {
+        if (!mCurrentSite) return "";
+        return TextUtils.isEmpty(getSiteKey()) ? getHome().getKey() : getSiteKey();
+    }
+
+    private void setSearchScope() {
+        if (!TextUtils.isEmpty(mScopeGroup)) mBinding.searchScope.setText(mScopeGroup);
+        else mBinding.searchScope.setText(mCurrentSite ? R.string.search_scope_current : R.string.search_scope_all);
+    }
+
+    private void onScope() {
+        mScopeGroup = "";
+        if (!mCurrentSite) {
+            Site site = getHome();
+            if (site.isEmpty() || !site.isSearchable()) {
+                Notify.show(R.string.detail_site_not_searchable);
+                return;
+            }
+            Notify.show(getString(R.string.search_scope_current_hint, site.getName()));
+        }
+        mCurrentSite = !mCurrentSite;
+        setSearchScope();
+    }
+
+    private void showScopeMenu(View anchor) {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setBackgroundColor(0xFFFFFFFF);
+        PopupWindow popup = new PopupWindow(content, ResUtil.dp2px(136), ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        addScopeItem(content, getString(R.string.search_scope_all), () -> selectScope(false, "", popup));
+        addScopeItem(content, getString(R.string.search_scope_current), () -> selectCurrent(popup));
+        for (String group : Site.getGroups(VodConfig.get().getSites())) addScopeItem(content, group, () -> selectScope(false, group, popup));
+        popup.setOutsideTouchable(true);
+        popup.showAsDropDown(anchor, 0, 0, Gravity.NO_GRAVITY);
+    }
+
+    private void addScopeItem(LinearLayout parent, String text, Runnable action) {
+        com.google.android.material.textview.MaterialTextView view = new com.google.android.material.textview.MaterialTextView(this);
+        view.setText(text);
+        view.setTextColor(0xFF000000);
+        view.setTextSize(18);
+        view.setGravity(Gravity.CENTER_VERTICAL);
+        view.setSingleLine(true);
+        view.setFocusable(true);
+        view.setBackgroundResource(R.drawable.selector_item);
+        view.setPadding(ResUtil.dp2px(28), 0, ResUtil.dp2px(28), 0);
+        view.setOnClickListener(v -> action.run());
+        parent.addView(view, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ResUtil.dp2px(68)));
+    }
+
+    private void selectCurrent(PopupWindow popup) {
+        Site site = getHome();
+        if (site.isEmpty() || !site.isSearchable()) {
+            Notify.show(R.string.detail_site_not_searchable);
+            return;
+        }
+        Notify.show(getString(R.string.search_scope_current_hint, site.getName()));
+        selectScope(true, "", popup);
+    }
+
+    private void selectScope(boolean current, String group, PopupWindow popup) {
+        mCurrentSite = current;
+        mScopeGroup = group;
+        setSearchScope();
+        popup.dismiss();
     }
 
     @Override

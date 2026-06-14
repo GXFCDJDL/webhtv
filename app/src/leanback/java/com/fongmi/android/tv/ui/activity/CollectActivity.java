@@ -53,13 +53,18 @@ public class CollectActivity extends BaseActivity implements CollectAdapter.OnCl
     private boolean mLeavingForPlayback;
 
     public static void start(Activity activity, String keyword) {
-        start(activity, keyword, null);
+        start(activity, keyword, null, null);
     }
 
     public static void start(Activity activity, String keyword, String siteKey) {
+        start(activity, keyword, siteKey, null);
+    }
+
+    public static void start(Activity activity, String keyword, String siteKey, String group) {
         Intent intent = new Intent(activity, CollectActivity.class);
         intent.putExtra("keyword", keyword);
         intent.putExtra("siteKey", siteKey);
+        intent.putExtra("group", group);
         activity.startActivity(intent);
     }
 
@@ -69,6 +74,10 @@ public class CollectActivity extends BaseActivity implements CollectAdapter.OnCl
 
     private String getSiteKey() {
         return Objects.toString(getIntent().getStringExtra("siteKey"), "");
+    }
+
+    private String getGroup() {
+        return Objects.toString(getIntent().getStringExtra("group"), "");
     }
 
     @Override
@@ -82,6 +91,7 @@ public class CollectActivity extends BaseActivity implements CollectAdapter.OnCl
         getIntent().putExtras(intent);
         if (mViewModel != null) mViewModel.stopSearch();
         saveKeyword();
+        setSites();
         search();
     }
 
@@ -160,10 +170,12 @@ public class CollectActivity extends BaseActivity implements CollectAdapter.OnCl
 
     private void setSites() {
         String siteKey = getSiteKey();
+        String group = getGroup();
         mSites = new ArrayList<>();
         for (Site site : VodConfig.get().getSites()) {
             if (!site.isSearchable()) continue;
             if (!siteKey.isEmpty() && !site.getKey().equals(siteKey)) continue;
+            if (!group.isEmpty() && !site.inGroup(group)) continue;
             mSites.add(site);
         }
         SiteHealthStore.sortSites(mSites);
@@ -175,10 +187,16 @@ public class CollectActivity extends BaseActivity implements CollectAdapter.OnCl
         mSearchAdapter.clear();
         mPendingItems.clear();
         mScroller.reset();
-        mBinding.result.setText(getString(R.string.collect_result, getKeyword()));
+        mBinding.result.setText(getResultTitle());
         if (mSites.isEmpty()) return;
         mCollectAdapter.add(Collect.all());
         mViewModel.searchContent(mSites, getKeyword(), false);
+    }
+
+    private String getResultTitle() {
+        if (!getGroup().isEmpty()) return getString(R.string.search_result_group, getGroup(), getKeyword());
+        if (!getSiteKey().isEmpty()) return getString(R.string.search_result_current, getKeyword());
+        return getString(R.string.collect_result, getKeyword());
     }
 
     private int getCount() {
