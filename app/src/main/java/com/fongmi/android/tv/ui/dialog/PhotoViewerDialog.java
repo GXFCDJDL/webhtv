@@ -13,13 +13,16 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager2.widget.ViewPager2;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.utils.Notify;
 import com.fongmi.android.tv.utils.TmdbImageSaver;
+import com.fongmi.android.tv.utils.Util;
 import com.google.android.material.button.MaterialButton;
 
 import java.util.List;
@@ -75,46 +78,65 @@ public class PhotoViewerDialog {
         root.addView(viewPager);
 
         // 右上角保存按钮 - 始终显示
+        FrameLayout saveBtnWrapper = new FrameLayout(activity);
+        FrameLayout.LayoutParams saveWrapperParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP | Gravity.END
+        );
+        saveWrapperParams.setMargins(16, 48, 16, 16);
+        saveBtnWrapper.setLayoutParams(saveWrapperParams);
+        if (Util.isLeanback()) {
+            saveBtnWrapper.setFocusable(true);
+            saveBtnWrapper.setFocusableInTouchMode(true);
+            saveBtnWrapper.setClickable(true);
+            saveBtnWrapper.setForeground(ContextCompat.getDrawable(activity, R.drawable.selector_tmdb_card));
+        }
+
         MaterialButton saveBtn = new MaterialButton(activity);
         saveBtn.setText(R.string.detail_image_save);
         saveBtn.setTextColor(Color.WHITE);
         saveBtn.setBackgroundColor(0x80000000);
         saveBtn.setPadding(32, 16, 32, 16);
-        FrameLayout.LayoutParams saveBtnParams = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP | Gravity.END
-        );
-        saveBtnParams.setMargins(16, 48, 16, 16);
-        saveBtn.setLayoutParams(saveBtnParams);
-        saveBtn.setOnClickListener(v -> {
+        saveBtn.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        saveBtnWrapper.addView(saveBtn);
+
+        // TV版由wrapper处理点击（焦点效果），手机版由按钮直接处理
+        View.OnClickListener saveAction = v -> {
             if (currentPosition < photos.size()) {
                 String url = photos.get(currentPosition);
-                // 优先使用自定义 saveListener，否则使用默认保存逻辑
                 if (saveListener != null) {
                     saveListener.onSave(url);
                 } else {
                     savePhotoDefault(url);
                 }
             }
-        });
-        root.addView(saveBtn);
+        };
+        if (Util.isLeanback()) {
+            saveBtnWrapper.setOnClickListener(saveAction);
+            saveBtn.setClickable(false);
+        } else {
+            saveBtn.setOnClickListener(saveAction);
+        }
+        root.addView(saveBtnWrapper);
 
-        // 左上角旋转按钮 - 始终显示
-        MaterialButton rotateBtn = new MaterialButton(activity);
-        rotateBtn.setText(R.string.detail_image_rotate);
-        rotateBtn.setTextColor(Color.WHITE);
-        rotateBtn.setBackgroundColor(0x80000000);
-        rotateBtn.setPadding(32, 16, 32, 16);
-        FrameLayout.LayoutParams rotateBtnParams = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP | Gravity.START
-        );
-        rotateBtnParams.setMargins(16, 48, 16, 16);
-        rotateBtn.setLayoutParams(rotateBtnParams);
-        rotateBtn.setOnClickListener(v -> toggleOrientation());
-        root.addView(rotateBtn);
+        // 左上角旋转按钮 - 仅非TV版显示
+        if (!Util.isLeanback()) {
+            MaterialButton rotateBtn = new MaterialButton(activity);
+            rotateBtn.setText(R.string.detail_image_rotate);
+            rotateBtn.setTextColor(Color.WHITE);
+            rotateBtn.setBackgroundColor(0x80000000);
+            rotateBtn.setPadding(32, 16, 32, 16);
+            FrameLayout.LayoutParams rotateBtnParams = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.TOP | Gravity.START
+            );
+            rotateBtnParams.setMargins(16, 48, 16, 16);
+            rotateBtn.setLayoutParams(rotateBtnParams);
+            rotateBtn.setOnClickListener(v -> toggleOrientation());
+            root.addView(rotateBtn);
+        }
 
         dialog.setContentView(root);
         Window window = dialog.getWindow();
@@ -175,16 +197,15 @@ public class PhotoViewerDialog {
 
     /**
      * 转换为高清图片 URL（original 尺寸）。
+     * 兼容 TMDB 官方域名和自定义代理。
      */
     private String convertToHighRes(String url) {
         if (TextUtils.isEmpty(url)) return url;
-        // TMDB 图片 URL 格式：https://image.tmdb.org/t/p/w500/xxx.jpg
-        // 替换为 original：https://image.tmdb.org/t/p/original/xxx.jpg
-        if (url.contains("image.tmdb.org/t/p/")) {
-            return url.replaceFirst("/w\\d+/", "/original/")
-                      .replaceFirst("/h\\d+/", "/original/");
-        }
-        return url;
+        // 匹配 /t/p/wXXX/ 或 /t/p/hXXX/ 模式，替换为 /t/p/original/
+        String result = url.replaceFirst("(/t/p/)(w\\d+|h\\d+)(/)", "$1original$3");
+        if (!result.equals(url)) return result;
+        // 兜底：匹配通用 /wXXX/ 模式（兼容非标准路径格式）
+        return url.replaceFirst("/w\\d+/", "/original/");
     }
 
     /**
@@ -210,7 +231,8 @@ public class PhotoViewerDialog {
         @Override
         public void onBindViewHolder(@NonNull PhotoViewHolder holder, int position) {
             Glide.with(holder.imageView.getContext())
-                    .load(urls.get(position))
+                    .load(convertToHighRes(urls.get(position)))
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
                     .into(holder.imageView);
         }
 

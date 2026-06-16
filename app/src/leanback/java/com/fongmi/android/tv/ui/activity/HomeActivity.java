@@ -50,6 +50,7 @@ import com.fongmi.android.tv.player.Source;
 import com.fongmi.android.tv.server.Server;
 import com.fongmi.android.tv.service.DLNARendererService;
 import com.fongmi.android.tv.service.PlaybackService;
+import com.fongmi.android.tv.setting.Setting;
 import com.fongmi.android.tv.ui.adapter.BaseDiffCallback;
 import com.fongmi.android.tv.ui.adapter.TypeAdapter;
 import com.fongmi.android.tv.ui.base.BaseActivity;
@@ -349,7 +350,9 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         setLogo();
         setFunc();
         getHistory();
-        getVideo();
+        boolean autoLoad = Setting.isHomeVodAutoLoad();
+        SpiderDebug.log("startup", "home_vod_auto_load=%s", autoLoad);
+        if (autoLoad) getVideo();
         setFocus();
         App.post(this::prewarmWebView, 1500);
         SpiderDebug.log("startup", "home showContent end cost=%sms", System.currentTimeMillis() - App.time());
@@ -459,11 +462,9 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
 
     private void setFunc() {
         List<Func> items = new ArrayList<>();
-        if (LiveConfig.hasUrl()) items.add(Func.create(R.string.home_live));
-        items.add(Func.create(R.string.home_search));
-        items.add(Func.create(R.string.home_keep));
-        items.add(Func.create(R.string.home_push));
-        items.add(Func.create(R.string.home_setting));
+        for (com.fongmi.android.tv.bean.HomeButton button : com.fongmi.android.tv.bean.HomeButton.getVisibleButtons()) {
+            items.add(Func.create(button.getResId()));
+        }
         mFuncAdapter.setItems(items, new BaseDiffCallback<Func>());
     }
 
@@ -583,11 +584,15 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
 
     @Override
     public void onItemClick(Func item) {
-        if (item.getResId() == R.string.home_live) LiveActivity.start(this);
+        if (item.getResId() == R.string.home_vod) {
+            if (mResult.getTypes().isEmpty()) getVideo();
+        } else if (item.getResId() == R.string.home_live) LiveActivity.start(this);
         else if (item.getResId() == R.string.home_keep) KeepActivity.start(this);
         else if (item.getResId() == R.string.home_push) PushActivity.start(this);
         else if (item.getResId() == R.string.home_search) SearchActivity.start(this);
         else if (item.getResId() == R.string.home_setting) SettingActivity.start(this);
+        else if (item.getResId() == R.string.home_cast) PushActivity.start(this, 3);
+        else if (item.getResId() == R.string.home_history_button) HistoryActivity.start(this);
     }
 
     @Override
@@ -736,6 +741,7 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         super.onResume();
         mClock.start();
         if (mWeb != null) mWeb.onResume();
+        setFunc();
     }
 
     @Override

@@ -11,6 +11,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -34,6 +35,7 @@ import com.fongmi.android.tv.ui.adapter.TmdbPersonWorkAdapter;
 import com.fongmi.android.tv.utils.Notify;
 import com.fongmi.android.tv.utils.Task;
 import com.fongmi.android.tv.utils.TmdbImageSaver;
+import com.fongmi.android.tv.utils.Util;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.gson.JsonObject;
@@ -72,6 +74,11 @@ public class TmdbPersonDialog {
     private String currentFilter = "all";
     private List<String> personPhotos = new ArrayList<>();
 
+    // 懒加载相关
+    private static final int PAGE_SIZE_INITIAL = 20;
+    private static final int PAGE_SIZE_LOAD_MORE = 12;
+    private boolean isLoadingMore = false;
+
     public static void show(Activity activity, TmdbPerson person) {
         new TmdbPersonDialog(activity, person).show();
     }
@@ -93,6 +100,8 @@ public class TmdbPersonDialog {
         if (window != null) {
             window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
             window.setBackgroundDrawableResource(android.R.color.transparent);
+            window.setDimAmount(0f);
+            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
         }
 
         initView(view);
@@ -132,18 +141,31 @@ public class TmdbPersonDialog {
         photosRecycler.setLayoutManager(new LinearLayoutManager(activity, LinearLayoutManager.HORIZONTAL, false));
         photosRecycler.setAdapter(photoAdapter);
 
-        // 设置作品列表（一行一个，垂直滚动，优化性能）
+        // 设置作品列表（双列网格，懒加载）
         workAdapter = new TmdbPersonWorkAdapter(this::onWorkClick);
-        LinearLayoutManager layoutManager = new LinearLayoutManager(activity);
-        worksRecycler.setLayoutManager(layoutManager);
+        GridLayoutManager gridLayoutManager = new GridLayoutManager(activity, 2);
+        worksRecycler.setLayoutManager(gridLayoutManager);
         worksRecycler.setAdapter(workAdapter);
-        worksRecycler.setRecycledViewPool(new RecyclerView.RecycledViewPool());
-        worksRecycler.setItemViewCacheSize(10);  // 增加缓存
-        worksRecycler.setDrawingCacheEnabled(true);
-        worksRecycler.setDrawingCacheQuality(View.DRAWING_CACHE_QUALITY_HIGH);
+        worksRecycler.setHasFixedSize(false);
+        worksRecycler.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                if (dy <= 0) return;
+                int total = gridLayoutManager.getItemCount();
+                int visible = gridLayoutManager.getChildCount();
+                int first = gridLayoutManager.findFirstVisibleItemPosition();
+                if (first + visible >= total - 4) {
+                    loadMoreWorks();
+                }
+            }
+        });
 
-        // 关闭按钮
-        closeBtn.setOnClickListener(v -> dialog.dismiss());
+        // 关闭按钮（TV版隐藏，遥控器无法获取焦点）
+        if (Util.isLeanback()) {
+            closeBtn.setVisibility(View.GONE);
+        } else {
+            closeBtn.setOnClickListener(v -> dialog.dismiss());
+        }
     }
 
     /**
@@ -263,6 +285,17 @@ public class TmdbPersonDialog {
             chip.setCheckable(true);
             chip.setChecked(filter.equals(currentFilter));
             chip.setOnClickListener(v -> filterWorks(filter));
+            if (Util.isLeanback()) {
+                chip.setFocusable(true);
+                chip.setOnFocusChangeListener((v, hasFocus) -> {
+                    chip.setChipBackgroundColorResource(hasFocus ? android.R.color.white : android.R.color.transparent);
+                    chip.setTextColor(hasFocus ? 0xFF1C2530 : 0xFFFFFFFF);
+                });
+                chip.setChipBackgroundColorResource(android.R.color.transparent);
+                chip.setTextColor(0xFFFFFFFF);
+                chip.setChipStrokeColorResource(R.color.white);
+                chip.setChipStrokeWidth(2f);
+            }
             filterChips.addView(chip);
         }
 
@@ -270,15 +303,33 @@ public class TmdbPersonDialog {
     }
 
     /**
-     * 根据筛选条件显示作品（显示全部，但优化加载）。
+     * 根据筛选条件显示作品（分批懒加载）。
      */
     private void filterWorks(String filter) {
         currentFilter = filter;
         List<TmdbItem> items = worksByCategory.get(filter);
         if (items != null) {
-            workAdapter.setItems(items);
+            isLoadingMore = false;
+            int initialCount = Math.min(PAGE_SIZE_INITIAL, items.size());
+            workAdapter.setItems(items.subList(0, initialCount));
+            worksRecycler.scrollToPosition(0);
             worksRecycler.setVisibility(View.VISIBLE);
         }
+    }
+
+    /**
+     * 加载更多作品（懒加载）。
+     */
+    private void loadMoreWorks() {
+        if (isLoadingMore) return;
+        List<TmdbItem> items = worksByCategory.get(currentFilter);
+        if (items == null) return;
+        int loaded = workAdapter.getLoadedCount();
+        if (loaded >= items.size()) return;
+        isLoadingMore = true;
+        int to = Math.min(loaded + PAGE_SIZE_LOAD_MORE, items.size());
+        workAdapter.addItems(new ArrayList<>(items.subList(loaded, to)));
+        isLoadingMore = false;
     }
 
     /**
@@ -325,84 +376,49 @@ public class TmdbPersonDialog {
     }
 
     /**
-     * 作品点击 - 优先本站搜索，搜不到再全局搜索，同时获取 TMDB 剧集信息。
+     * 作品点击 - 优先本站搜索，搜不到再全局搜索。
      */
     private void onWorkClick(TmdbItem item) {
+        String title = item.getTitle();
+        android.util.Log.d("TmdbPersonDialog", "onWorkClick title=" + title);
+        if (TextUtils.isEmpty(title)) {
+            Notify.show("作品标题为空");
+            return;
+        }
         Site site = VodConfig.get().getHome();
         if (site == null || site.isEmpty() || !site.isSearchable()) {
-            SearchActivity.start(activity, item.getTitle());
+            android.util.Log.d("TmdbPersonDialog", "站源不可用，跳转全局搜索");
+            SearchActivity.start(activity, title);
             dismissDelayed();
             return;
         }
-        Notify.show(activity.getString(R.string.detail_work_searching, item.getTitle()));
+        Notify.show(activity.getString(R.string.detail_work_searching, title));
         Task.execute(() -> {
-            Vod match = searchCurrentSite(item.getTitle(), site);
-            ArrayList<String> episodeTitles = fetchEpisodeTitles(item);
-            activity.runOnUiThread(() -> {
-                if (match == null) {
-                    Notify.show(activity.getString(R.string.detail_work_global_searching, item.getTitle()));
-                    SearchActivity.start(activity, item.getTitle());
-                    dismissDelayed();
-                    return;
-                }
-                startVideoActivityWithEpisodes(site.getKey(), match.getId(), match.getName(), episodeTitles);
-                dismissDelayed();
-            });
-        });
-    }
-
-    /**
-     * 获取 TMDB 剧集标题列表（仅针对电视剧）。
-     */
-    private ArrayList<String> fetchEpisodeTitles(TmdbItem item) {
-        ArrayList<String> titles = new ArrayList<>();
-        if (item == null || !item.isTv()) return titles;
-        try {
-            com.fongmi.android.tv.service.TmdbService service = new com.fongmi.android.tv.service.TmdbService();
-            com.fongmi.android.tv.bean.TmdbConfig config = com.fongmi.android.tv.bean.TmdbConfig.objectFrom(com.fongmi.android.tv.setting.Setting.getTmdbConfig());
-            if (config == null || !config.isReady()) return titles;
-
-            // 尝试获取第1季（默认）
-            com.google.gson.JsonObject season = null;
             try {
-                season = service.season(item, 1, config);
-            } catch (Exception ignored) {
+                Vod match = searchCurrentSite(title, site);
+                activity.runOnUiThread(() -> {
+                    if (dialog == null || !dialog.isShowing()) return;
+                    if (match == null) {
+                        android.util.Log.d("TmdbPersonDialog", "本站未匹配，跳转全局搜索");
+                        Notify.show(activity.getString(R.string.detail_work_global_searching, title));
+                        SearchActivity.start(activity, title);
+                        dismissDelayed();
+                        return;
+                    }
+                    android.util.Log.d("TmdbPersonDialog", "匹配成功 key=" + site.getKey() + " id=" + match.getId() + " name=" + match.getName());
+                    VideoActivity.start(activity, site.getKey(), match.getId(), match.getName(), match.getPic());
+                    dismissDelayed();
+                });
+            } catch (Exception e) {
+                android.util.Log.e("TmdbPersonDialog", "搜索异常: " + e.getMessage(), e);
+                activity.runOnUiThread(() -> {
+                    if (dialog != null && dialog.isShowing()) {
+                        SearchActivity.start(activity, title);
+                        dismissDelayed();
+                    }
+                });
             }
-
-            // 第1季失败，尝试第0季（特别篇）
-            if (season == null) {
-                try {
-                    season = service.season(item, 0, config);
-                } catch (Exception ignored) {
-                }
-            }
-
-            if (season == null) return titles;
-
-            List<com.fongmi.android.tv.bean.TmdbEpisode> episodes = service.episodes(season, config);
-            for (com.fongmi.android.tv.bean.TmdbEpisode ep : episodes) {
-                if (!ep.getTitle().isEmpty()) {
-                    titles.add(ep.getNumber() + "\t" + ep.getTitle());
-                }
-            }
-        } catch (Exception e) {
-            android.util.Log.w("TmdbPersonDialog", "获取剧集信息失败: " + e.getMessage());
-        }
-        return titles;
-    }
-
-    /**
-     * 启动 VideoActivity 并传递集数信息。
-     */
-    private void startVideoActivityWithEpisodes(String key, String id, String name, ArrayList<String> episodeTitles) {
-        android.content.Intent intent = new android.content.Intent(activity, VideoActivity.class);
-        intent.putExtra("key", key);
-        intent.putExtra("id", id);
-        intent.putExtra("name", name);
-        if (episodeTitles != null && !episodeTitles.isEmpty()) {
-            intent.putStringArrayListExtra("tmdb_episode_titles", episodeTitles);
-        }
-        activity.startActivity(intent);
+        });
     }
 
     /**
@@ -495,13 +511,14 @@ public class TmdbPersonDialog {
 
     /**
      * 转换为高清图片 URL（original 尺寸）。
+     * 兼容 TMDB 官方域名和自定义代理。
      */
     private String highResTmdbImage(String url) {
-        int marker = url.indexOf("/t/p/");
-        if (marker < 0) return url;
-        int sizeStart = marker + "/t/p/".length();
-        int sizeEnd = url.indexOf('/', sizeStart);
-        if (sizeEnd < 0) return url;
-        return url.substring(0, sizeStart) + "original" + url.substring(sizeEnd);
+        if (TextUtils.isEmpty(url)) return url;
+        // 匹配 /t/p/wXXX/ 或 /t/p/hXXX/ 模式，替换为 /t/p/original/
+        String result = url.replaceFirst("(/t/p/)(w\\d+|h\\d+)(/)", "$1original$3");
+        if (!result.equals(url)) return result;
+        // 兜底：匹配通用 /wXXX/ 模式
+        return url.replaceFirst("/w\\d+/", "/original/");
     }
 }

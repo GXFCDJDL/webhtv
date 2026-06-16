@@ -7,7 +7,7 @@
     android:layout_marginBottom="8dp"
     android:clickable="true"
     android:focusable="true"
-    android:foreground="?attr/selectableItemBackground">
+    android:foreground="@drawable/selector_tmdb_card">
 
     <ImageView
         android:id="@+id/photo"

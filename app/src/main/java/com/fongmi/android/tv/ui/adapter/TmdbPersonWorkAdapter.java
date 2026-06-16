@@ -11,6 +11,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.bean.TmdbItem;
 
@@ -37,6 +38,20 @@ public class TmdbPersonWorkAdapter extends RecyclerView.Adapter<TmdbPersonWorkAd
         items.clear();
         if (values != null) items.addAll(values);
         notifyDataSetChanged();
+    }
+
+    /**
+     * 追加一批数据（用于懒加载分批显示）。
+     */
+    public void addItems(List<TmdbItem> values) {
+        if (values == null || values.isEmpty()) return;
+        int start = items.size();
+        items.addAll(values);
+        notifyItemRangeInserted(start, values.size());
+    }
+
+    public int getLoadedCount() {
+        return items.size();
     }
 
     @NonNull
@@ -74,14 +89,15 @@ public class TmdbPersonWorkAdapter extends RecyclerView.Adapter<TmdbPersonWorkAd
             holder.ratingBadge.setVisibility(View.GONE);
         }
 
-        // 海报（优化加载：限制尺寸 + 缩略图 + 禁用动画）
+        // 海报（高清大图 + 磁盘缓存优化）
         String posterUrl = item.getPosterUrl();
         if (posterUrl != null && !posterUrl.isEmpty()) {
             Glide.with(holder.poster.getContext())
-                    .load(posterUrl)
-                    .override(400, 600)   // 限制加载尺寸，不加载原始大图
-                    .thumbnail(0.1f)      // 先加载10%缩略图
-                    .dontAnimate()        // 禁用动画减少掉帧
+                    .load(toHighResUrl(posterUrl))
+                    .override(400, 600)
+                    .thumbnail(0.1f)
+                    .dontAnimate()
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
                     .into(holder.poster);
         }
 
@@ -94,6 +110,19 @@ public class TmdbPersonWorkAdapter extends RecyclerView.Adapter<TmdbPersonWorkAd
     @Override
     public int getItemCount() {
         return items.size();
+    }
+
+    /**
+     * 转换为高清图片 URL（w780 尺寸，平衡清晰度与加载速度）。
+     */
+    private static String toHighResUrl(String url) {
+        if (url == null || url.isEmpty()) return url;
+        int marker = url.indexOf("/t/p/");
+        if (marker < 0) return url;
+        int sizeStart = marker + "/t/p/".length();
+        int sizeEnd = url.indexOf('/', sizeStart);
+        if (sizeEnd < 0) return url;
+        return url.substring(0, sizeStart) + "w780" + url.substring(sizeEnd);
     }
 
     static class ViewHolder extends RecyclerView.ViewHolder {

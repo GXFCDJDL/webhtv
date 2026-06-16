@@ -62,6 +62,15 @@
     <string name="play_switch_site">Switching site to <xliff:g name="name">%s</xliff:g></string>
     <string name="play_switch_parse">Switching parse to <xliff:g name="name">%s</xliff:g></string>
 
+    <!-- Control -->
+    <string name="control_display">Display</string>
+    <string name="display_time">Time</string>
+    <string name="display_traffic">Speed</string>
+    <string name="display_size">Resolution</string>
+    <string name="display_progress">Progress</string>
+    <string name="display_mini">Mini</string>
+    <string name="display_title">Title</string>
+
     <!-- Danmaku Setting -->
     <string name="danmaku">Danmaku</string>
     <string name="danmaku_select">Select danmaku</string>
@@ -124,6 +133,14 @@
     <string name="setting_player">Player setting</string>
     <string name="setting_danmaku">Danmaku setting</string>
     <string name="setting_enhance">Enhancements</string>
+    <string name="setting_personal">Personal</string>
+    <string name="setting_home_vod_auto_load">Auto-load VOD</string>
+    <string name="setting_fullscreen_menu_key">Fullscreen menu key</string>
+    <string name="setting_home_menu_key">Home menu key</string>
+    <string name="setting_play_back_to_detail">Return playback to detail</string>
+    <string name="setting_home_history">Home recent history</string>
+    <string name="setting_search_ui">Search layout</string>
+    <string name="setting_search_column">Search results per row</string>
     <string name="setting_debug_log">Debug log</string>
     <string name="setting_manage_page">Management page</string>
     <string name="setting_login_state">Login state learning</string>
@@ -646,6 +663,35 @@
         <item>Medium</item>
         <item>Large</item>
         <item>Extra</item>
+    </string-array>
+
+    <string-array name="select_fullscreen_menu_key">
+        <item>Control</item>
+        <item>Episodes</item>
+    </string-array>
+
+    <string-array name="select_home_menu_key">
+        <item>Select dialog</item>
+        <item>Change site</item>
+        <item>Change config</item>
+        <item>Live page</item>
+        <item>History page</item>
+        <item>Search page</item>
+        <item>Push page</item>
+        <item>Cast page</item>
+        <item>Keep page</item>
+        <item>Setting page</item>
+    </string-array>
+
+    <string-array name="select_search_ui">
+        <item>Horizontal</item>
+        <item>Vertical</item>
+    </string-array>
+
+    <string-array name="select_search_column">
+        <item>Auto</item>
+        <item>1 item</item>
+        <item>2 items</item>
     </string-array>
 
     <string-array name="select_scale">
