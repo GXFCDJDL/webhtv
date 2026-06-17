@@ -731,6 +731,9 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
         // 先添加数据，让适配器检测是否有TMDB数据
         mEpisodeAdapter.addAll(items);
 
+        // 根据设置决定是否使用TMDB卡片模式
+        mEpisodeAdapter.setUseTmdbCard(Setting.isTmdbEnabled());
+
         // 横向滚动，所有模式都使用1列
         mEpisodeAdapter.setColumn(1);
 

@@ -1,111 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- TV版选集卡片布局 -->
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<!-- TV版选集按钮 - 简单文本模式 -->
+<com.google.android.material.textview.MaterialTextView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/container"
+    android:id="@+id/text"
     android:layout_width="wrap_content"
-    android:layout_height="wrap_content">
-
-    <!-- 简单文本模式 -->
-    <com.fongmi.android.tv.ui.custom.NoHighlightTextView
-        android:id="@+id/text"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:background="@drawable/selector_video_item"
-        android:ellipsize="marquee"
-        android:focusable="true"
-        android:focusableInTouchMode="true"
-        android:gravity="center"
-        android:nextFocusUp="@id/array"
-        android:nextFocusDown="@id/part"
-        android:singleLine="true"
-        android:textColor="@color/text"
-        android:textSize="16sp"
-        tools:text="第20集" />
-
-    <!-- TMDB 卡片模式：和剧照卡片完全一样的CardView结构 -->
-    <androidx.cardview.widget.CardView
-        android:id="@+id/cardContainer"
-        android:layout_width="220dp"
-        android:layout_height="wrap_content"
-        android:layout_marginEnd="12dp"
-        android:focusable="true"
-        android:focusableInTouchMode="true"
-        android:foreground="@null"
-        android:visibility="gone"
-        android:stateListAnimator="@null"
-        android:defaultFocusHighlightEnabled="false"
-        app:cardCornerRadius="8dp"
-        app:cardElevation="3dp">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="#2A2A2A"
-            android:orientation="vertical">
-
-            <!-- 剧照 -->
-            <ImageView
-                android:id="@+id/still"
-                android:layout_width="match_parent"
-                android:layout_height="124dp"
-                android:background="#1A1A1A"
-                android:contentDescription="@null"
-                android:scaleType="centerCrop" />
-
-            <!-- 标题和简介 -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="8dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <com.google.android.material.textview.MaterialTextView
-                        android:id="@+id/cardTitle"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="@color/white"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        tools:text="第1集" />
-
-                    <com.google.android.material.textview.MaterialTextView
-                        android:id="@+id/rating"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp"
-                        android:textColor="#FFD700"
-                        android:textSize="12sp"
-                        android:visibility="gone"
-                        tools:text="★8.5" />
-
-                </LinearLayout>
-
-                <com.google.android.material.textview.MaterialTextView
-                    android:id="@+id/overview"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:ellipsize="end"
-                    android:maxLines="2"
-                    android:textColor="#CCCCCC"
-                    android:textSize="12sp"
-                    tools:text="简介..." />
-
-            </LinearLayout>
-
-        </LinearLayout>
-
-    </androidx.cardview.widget.CardView>
-
-</FrameLayout>
+    android:layout_height="wrap_content"
+    android:background="@drawable/selector_video_item"
+    android:ellipsize="marquee"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:gravity="center"
+    android:nextFocusUp="@id/array"
+    android:nextFocusDown="@id/part"
+    android:singleLine="true"
+    android:textColor="@color/text"
+    android:textSize="16sp"
+    tools:text="第20集" />

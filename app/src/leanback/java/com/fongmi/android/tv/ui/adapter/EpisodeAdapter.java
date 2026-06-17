@@ -3,7 +3,6 @@ package com.fongmi.android.tv.ui.adapter;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.FrameLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -14,12 +13,16 @@ import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.bean.Episode;
 import com.fongmi.android.tv.bean.TmdbEpisode;
 import com.fongmi.android.tv.databinding.AdapterEpisodeBinding;
+import com.fongmi.android.tv.databinding.AdapterEpisodeCardBinding;
 import com.fongmi.android.tv.utils.ResUtil;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHolder> {
+
+    private static final int VIEW_TYPE_TEXT = 0;
+    private static final int VIEW_TYPE_CARD = 1;
 
     private final OnClickListener mListener;
     private final OnLongClickListener mLongClickListener;
@@ -47,7 +50,14 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
     public void addAll(List<Episode> items) {
         mItems.clear();
         mItems.addAll(items);
-        useTmdbCard = false;
+        column = useTmdbCard ? 1 : getColumn(items);
+        notifyDataSetChanged();
+    }
+
+    public void setUseTmdbCard(boolean useTmdbCard) {
+        if (this.useTmdbCard == useTmdbCard) return;
+        this.useTmdbCard = useTmdbCard;
+        column = useTmdbCard ? 1 : getColumn(mItems);
         notifyDataSetChanged();
     }
 
@@ -145,94 +155,112 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
 
     @Override
     public int getItemViewType(int position) {
-        // 根据是否使用 TMDB 卡片返回不同的 view type
         Episode item = mItems.get(position);
-        return (useTmdbCard && item.getTmdbEpisode() != null) ? 1 : 0;
+        // 如果启用了TMDB卡片模式，且该集数有TMDB数据，则使用卡片布局
+        return (useTmdbCard && item.getTmdbEpisode() != null) ? VIEW_TYPE_CARD : VIEW_TYPE_TEXT;
     }
 
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        if (viewType == 1) {
-            // TMDB 卡片模式 - 使用原布局
-            AdapterEpisodeBinding binding = AdapterEpisodeBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false);
+        if (viewType == VIEW_TYPE_CARD) {
+            // TMDB 卡片模式
+            AdapterEpisodeCardBinding binding = AdapterEpisodeCardBinding.inflate(
+                    LayoutInflater.from(parent.getContext()), parent, false);
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                 binding.cardContainer.setDefaultFocusHighlightEnabled(false);
             }
             return new ViewHolder(binding);
         } else {
-            // 简单文本模式 - 使用简化布局（和 ArrayAdapter 一样，无 FrameLayout）
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.adapter_episode_simple, parent, false);
-            return new ViewHolder(view);
+            // 简单文本模式
+            AdapterEpisodeBinding binding = AdapterEpisodeBinding.inflate(
+                    LayoutInflater.from(parent.getContext()), parent, false);
+            return new ViewHolder(binding);
         }
     }
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Episode item = mItems.get(position);
-        TmdbEpisode tmdbEpisode = item.getTmdbEpisode();
 
-        if (useTmdbCard && tmdbEpisode != null && holder.getBinding() != null) {
+        if (getItemViewType(position) == VIEW_TYPE_CARD) {
             // TMDB 卡片模式
-            AdapterEpisodeBinding binding = holder.getBinding();
-            binding.text.setVisibility(View.GONE);
-            binding.cardContainer.setVisibility(View.VISIBLE);
+            bindCardView(holder, item, position);
+        } else {
+            // 简单文本模式
+            bindTextView(holder, item, position);
+        }
+    }
 
-            // 设置选中状态（用于边框颜色）
-            binding.cardContainer.setSelected(item.isSelected());
+    private void bindTextView(@NonNull ViewHolder holder, Episode item, int position) {
+        TextView textView = holder.textView;
+        if (textView == null) return;
 
-            // 强制去除灰色遮罩效果
-            binding.cardContainer.setAlpha(1.0f);
-            binding.cardContainer.setForeground(null);
+        textView.getLayoutParams().width = getWidth();
+        textView.setNextFocusUpId(position < column && nextFocusUp != 0 ? nextFocusUp : View.NO_ID);
+        textView.setNextFocusDownId(position >= getItemCount() - column && nextFocusDown != 0 ? nextFocusDown : View.NO_ID);
+        textView.setSelected(item.isSelected());
+        textView.setText(getTitle(item));
+        textView.setOnClickListener(v -> mListener.onItemClick(item));
+        if (mLongClickListener != null) {
+            textView.setOnLongClickListener(v -> {
+                mLongClickListener.onItemLongClick(item);
+                return true;
+            });
+        }
+    }
 
-            // 加载剧照
-            if (!tmdbEpisode.getStillUrl().isEmpty()) {
-                Glide.with(binding.still.getContext())
-                    .load(tmdbEpisode.getStillUrl())
-                    .placeholder(R.color.black)
-                    .error(R.color.black)
-                    .into(binding.still);
-            } else {
-                binding.still.setImageResource(R.color.black);
-            }
+    private void bindCardView(@NonNull ViewHolder holder, Episode item, int position) {
+        AdapterEpisodeCardBinding binding = holder.cardBinding;
+        if (binding == null) return;
 
-            // 设置标题
-            binding.cardTitle.setText(tmdbEpisode.getDisplayTitle());
+        TmdbEpisode tmdbEpisode = item.getTmdbEpisode();
+        if (tmdbEpisode == null) return;
 
-            // 设置评分
-            if (tmdbEpisode.getVoteAverage() > 0) {
-                binding.rating.setText(String.format("★%.1f", tmdbEpisode.getVoteAverage()));
-                binding.rating.setVisibility(View.VISIBLE);
-            } else {
-                binding.rating.setVisibility(View.GONE);
-            }
+        // 设置选中状态（用于边框颜色）
+        binding.cardContainer.setSelected(item.isSelected());
 
-            // 设置简介
-            if (!tmdbEpisode.getOverview().isEmpty()) {
-                binding.overview.setText(tmdbEpisode.getOverview());
-                binding.overview.setVisibility(View.VISIBLE);
-            } else {
-                binding.overview.setVisibility(View.GONE);
-            }
+        // 强制去除灰色遮罩效果
+        binding.cardContainer.setAlpha(1.0f);
+        binding.cardContainer.setForeground(null);
 
-            // 点击和长按事件
-            binding.cardContainer.setOnClickListener(v -> mListener.onItemClick(item));
-            if (mLongClickListener != null) {
-                binding.cardContainer.setOnLongClickListener(v -> {
-                    mLongClickListener.onItemLongClick(item);
-                    return true;
-                });
-            }
+        // 加载剧照
+        if (!tmdbEpisode.getStillUrl().isEmpty()) {
+            Glide.with(binding.still.getContext())
+                .load(tmdbEpisode.getStillUrl())
+                .placeholder(R.color.black)
+                .error(R.color.black)
+                .into(binding.still);
+        } else {
+            binding.still.setImageResource(R.color.black);
+        }
 
-        } else if (holder.getSimpleText() != null) {
-            // 简单文本模式 - 使用简化布局
-            TextView textView = holder.getSimpleText();
-            textView.getLayoutParams().width = getWidth();
-            textView.setNextFocusUpId(position < column && nextFocusUp != 0 ? nextFocusUp : View.NO_ID);
-            textView.setNextFocusDownId(position >= getItemCount() - column && nextFocusDown != 0 ? nextFocusDown : View.NO_ID);
-            textView.setSelected(item.isSelected());
-            textView.setText(item.getDesc().concat(item.getName()));
-            textView.setOnClickListener(v -> mListener.onItemClick(item));
+        // 设置标题
+        binding.cardTitle.setText(tmdbEpisode.getDisplayTitle());
+
+        // 设置评分
+        if (tmdbEpisode.getVoteAverage() > 0) {
+            binding.rating.setText(String.format("★%.1f", tmdbEpisode.getVoteAverage()));
+            binding.rating.setVisibility(View.VISIBLE);
+        } else {
+            binding.rating.setVisibility(View.GONE);
+        }
+
+        // 设置简介
+        if (!tmdbEpisode.getOverview().isEmpty()) {
+            binding.overview.setText(tmdbEpisode.getOverview());
+            binding.overview.setVisibility(View.VISIBLE);
+        } else {
+            binding.overview.setVisibility(View.GONE);
+        }
+
+        // 点击和长按事件
+        binding.cardContainer.setOnClickListener(v -> mListener.onItemClick(item));
+        if (mLongClickListener != null) {
+            binding.cardContainer.setOnLongClickListener(v -> {
+                mLongClickListener.onItemLongClick(item);
+                return true;
+            });
         }
     }
 
@@ -246,25 +274,19 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
 
-        private AdapterEpisodeBinding binding;
-        private TextView simpleText;
+        private TextView textView;
+        private AdapterEpisodeCardBinding cardBinding;
 
+        // 简单文本模式的 ViewHolder
         ViewHolder(@NonNull AdapterEpisodeBinding binding) {
             super(binding.getRoot());
-            this.binding = binding;
+            this.textView = binding.text;
         }
 
-        ViewHolder(@NonNull View itemView) {
-            super(itemView);
-            this.simpleText = itemView.findViewById(R.id.text);
-        }
-
-        public AdapterEpisodeBinding getBinding() {
-            return binding;
-        }
-
-        public TextView getSimpleText() {
-            return simpleText;
+        // TMDB 卡片模式的 ViewHolder
+        ViewHolder(@NonNull AdapterEpisodeCardBinding binding) {
+            super(binding.getRoot());
+            this.cardBinding = binding;
         }
     }
 }
