@@ -421,6 +421,18 @@ public class Setting {
         Prefers.put("search_ui", ui == 0 ? 0 : 1);
     }
 
+    public static int getSearchThread() {
+        return clampSearchThread(Prefers.getInt("search_thread", 10));
+    }
+
+    public static void putSearchThread(int thread) {
+        Prefers.put("search_thread", clampSearchThread(thread));
+    }
+
+    private static int clampSearchThread(int thread) {
+        return Math.max(1, Math.min(thread, 32));
+    }
+
     public static int getSearchColumn() {
         return clampSearchColumn(Prefers.getInt("search_column", 0));
     }

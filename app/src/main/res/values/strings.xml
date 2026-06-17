@@ -140,6 +140,7 @@
     <string name="setting_home_menu_key">Home menu key</string>
     <string name="setting_play_back_to_detail">Return playback to detail</string>
     <string name="setting_home_history">Home recent history</string>
+    <string name="setting_search_thread">Search threads</string>
     <string name="setting_search_ui">Search layout</string>
     <string name="setting_search_column">Search results per row</string>
     <string name="repo_github">GitHub repository</string>

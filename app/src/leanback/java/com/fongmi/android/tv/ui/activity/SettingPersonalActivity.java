@@ -20,6 +20,8 @@ import com.fongmi.android.tv.ui.dialog.HomeMenuKeyDialog;
 
 public class SettingPersonalActivity extends BaseActivity {
 
+    private static final int[] SEARCH_THREADS = {1, 2, 4, 6, 8, 10, 12, 16, 20, 32};
+
     private ActivitySettingPersonalBinding mBinding;
     private String[] fullscreenMenuKey;
     private String[] homeMenuKey;
@@ -54,6 +56,7 @@ public class SettingPersonalActivity extends BaseActivity {
         mBinding.homeMenuKey.setOnClickListener(this::setHomeMenuKey);
         mBinding.playBackToDetail.setOnClickListener(this::setPlayBackToDetail);
         mBinding.homeHistory.setOnClickListener(this::setHomeHistory);
+        mBinding.searchThread.setOnClickListener(this::setSearchThread);
         // mBinding.searchUi.setOnClickListener(this::setSearchUi); // 暂不支持横向/纵向布局切换
         // mBinding.searchColumn.setOnClickListener(this::setSearchColumn); // 在搜索页面切换更方便
         mBinding.display.setOnClickListener(this::onDisplay);
@@ -66,6 +69,7 @@ public class SettingPersonalActivity extends BaseActivity {
         mBinding.homeMenuKeyText.setText((homeMenuKey = getResources().getStringArray(R.array.select_home_menu_key))[Setting.getHomeMenuKey()]);
         mBinding.playBackToDetailText.setText(getSwitch(Setting.isPlayBackToDetail()));
         mBinding.homeHistoryText.setText(getSwitch(Setting.isHomeHistory()));
+        mBinding.searchThreadText.setText(String.valueOf(Setting.getSearchThread()));
         // mBinding.searchUiText.setText((searchUi = getResources().getStringArray(R.array.select_search_ui))[Setting.getSearchUi()]); // 暂不支持
         // mBinding.searchColumnText.setText(getSearchColumnText()); // 在搜索页面切换更方便
         mBinding.displayText.setText(getDisplayText());
@@ -123,6 +127,13 @@ public class SettingPersonalActivity extends BaseActivity {
     private void setHomeHistory(View view) {
         Setting.putHomeHistory(!Setting.isHomeHistory());
         RefreshEvent.history();
+        setText();
+    }
+
+    private void setSearchThread(View view) {
+        int index = 0;
+        for (int i = 0; i < SEARCH_THREADS.length; i++) if (SEARCH_THREADS[i] == Setting.getSearchThread()) index = i;
+        Setting.putSearchThread(SEARCH_THREADS[(index + 1) % SEARCH_THREADS.length]);
         setText();
     }
 
