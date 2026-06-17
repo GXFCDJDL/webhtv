@@ -115,7 +115,13 @@ public class CollectActivity extends BaseActivity implements CollectAdapter.OnCl
         setViewModel();
         saveKeyword();
         setSites();
+        setSearchColumn();
         search();
+    }
+
+    @Override
+    protected void initEvent() {
+        mBinding.searchColumn.setOnClickListener(v -> toggleSearchColumn());
     }
 
     private void setRecyclerView() {
@@ -214,7 +220,65 @@ public class CollectActivity extends BaseActivity implements CollectAdapter.OnCl
     }
 
     private int getCount() {
-        return 5;
+        int column = Setting.getSearchColumn();
+        if (column == 1) return 1; // 1列 (列表模式)
+        return getAutoCount(); // 自适应
+    }
+
+    private int getAutoCount() {
+        int width = ResUtil.getScreenWidth() - ResUtil.dp2px(220);
+        int itemWidth = ResUtil.dp2px(120);
+        int spacing = ResUtil.dp2px(8);
+        return Math.max(3, Math.min(7, (width + spacing) / (itemWidth + spacing)));
+    }
+
+    private void setSearchColumn() {
+        int iconRes = getSearchColumnIcon();
+        mBinding.searchColumn.setImageResource(iconRes);
+        String description = getSearchColumnDescription();
+        mBinding.searchColumn.setContentDescription(description);
+    }
+
+    private int getSearchColumnIcon() {
+        int column = Setting.getSearchColumn();
+        if (column == 1) return R.drawable.ic_site_list; // 列表模式 (1列)
+        return R.drawable.ic_site_grid; // 网格模式 (自适应或默认)
+    }
+
+    private String getSearchColumnDescription() {
+        String[] options = getResources().getStringArray(R.array.select_search_column);
+        int column = Setting.getSearchColumn();
+        String current = column == 1 ? options[1] : options[0]; // 0: 自适应, 1: 1列
+        int nextColumn = column == 1 ? 0 : 1;
+        String next = nextColumn == 1 ? options[1] : options[0];
+        return getString(R.string.setting_search_column) + ": " + current + " → " + next;
+    }
+
+    private void toggleSearchColumn() {
+        int current = Setting.getSearchColumn();
+        int next = current == 1 ? 0 : 1; // 0: 自适应 ↔ 1: 1列
+        Setting.putSearchColumn(next);
+        setSearchColumn();
+        updateRecyclerLayout();
+    }
+
+    private void updateRecyclerLayout() {
+        int count = getCount();
+        GridLayoutManager layoutManager = (GridLayoutManager) mBinding.recycler.getLayoutManager();
+        if (layoutManager != null) {
+            layoutManager.setSpanCount(count);
+        }
+        mSearchAdapter = new SearchAdapter(this, getItemWidth(count), getItemHeight(count));
+        mBinding.recycler.setAdapter(mSearchAdapter);
+        mBinding.recycler.setItemViewCacheSize(count * 3);
+
+        // 重新加载当前选中的收藏项
+        if (mCollectAdapter != null && mCollectAdapter.getPosition() >= 0) {
+            Collect activated = mCollectAdapter.getActivated();
+            if (activated != null) {
+                setSearchItemsLazy(new ArrayList<>(activated.getList()));
+            }
+        }
     }
 
     private int getItemWidth(int count) {

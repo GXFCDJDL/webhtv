@@ -54,8 +54,8 @@ public class SettingPersonalActivity extends BaseActivity {
         mBinding.homeMenuKey.setOnClickListener(this::setHomeMenuKey);
         mBinding.playBackToDetail.setOnClickListener(this::setPlayBackToDetail);
         mBinding.homeHistory.setOnClickListener(this::setHomeHistory);
-        mBinding.searchUi.setOnClickListener(this::setSearchUi);
-        mBinding.searchColumn.setOnClickListener(this::setSearchColumn);
+        // mBinding.searchUi.setOnClickListener(this::setSearchUi); // 暂不支持横向/纵向布局切换
+        // mBinding.searchColumn.setOnClickListener(this::setSearchColumn); // 在搜索页面切换更方便
         mBinding.display.setOnClickListener(this::onDisplay);
     }
 
@@ -66,14 +66,18 @@ public class SettingPersonalActivity extends BaseActivity {
         mBinding.homeMenuKeyText.setText((homeMenuKey = getResources().getStringArray(R.array.select_home_menu_key))[Setting.getHomeMenuKey()]);
         mBinding.playBackToDetailText.setText(getSwitch(Setting.isPlayBackToDetail()));
         mBinding.homeHistoryText.setText(getSwitch(Setting.isHomeHistory()));
-        mBinding.searchUiText.setText((searchUi = getResources().getStringArray(R.array.select_search_ui))[Setting.getSearchUi()]);
-        mBinding.searchColumnText.setText(getSearchColumnText());
+        // mBinding.searchUiText.setText((searchUi = getResources().getStringArray(R.array.select_search_ui))[Setting.getSearchUi()]); // 暂不支持
+        // mBinding.searchColumnText.setText(getSearchColumnText()); // 在搜索页面切换更方便
         mBinding.displayText.setText(getDisplayText());
     }
 
     private String getSearchColumnText() {
         searchColumn = getResources().getStringArray(R.array.select_search_column);
-        return searchColumn[Setting.getSearchColumn() == 1 ? 1 : 0];
+        int column = Setting.getSearchColumn();
+        if (column >= 0 && column < searchColumn.length) {
+            return searchColumn[column];
+        }
+        return searchColumn[0]; // 默认返回第一项
     }
 
     private String getDisplayText() {
@@ -122,15 +126,23 @@ public class SettingPersonalActivity extends BaseActivity {
         setText();
     }
 
+    // 暂不支持横向/纵向布局切换
+    /*
     private void setSearchUi(View view) {
         Setting.putSearchUi((Setting.getSearchUi() + 1) % searchUi.length);
         setText();
     }
+    */
 
+    // 在搜索页面切换更方便，此处不再提供设置入口
+    /*
     private void setSearchColumn(View view) {
-        Setting.putSearchColumn(Setting.getSearchColumn() == 1 ? 0 : 1);
+        int current = Setting.getSearchColumn();
+        int next = (current + 1) % 3; // 0: 自适应, 1: 1列, 2: 默认5列
+        Setting.putSearchColumn(next);
         setText();
     }
+    */
 
     private void onDisplay(View view) {
         DisplayDialog.show(this, this::setText);
