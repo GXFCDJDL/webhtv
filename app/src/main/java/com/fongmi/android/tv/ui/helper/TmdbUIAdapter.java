@@ -258,6 +258,51 @@ public class TmdbUIAdapter {
     }
 
     /**
+     * 年份文本，取首播/上映日期的年份，无则返回空串。
+     */
+    public String getYear() {
+        if (tmdbDetail == null) return "";
+        String date = readString(tmdbDetail, "first_air_date");
+        if (TextUtils.isEmpty(date)) date = readString(tmdbDetail, "release_date");
+        if (TextUtils.isEmpty(date) || date.length() < 4) return "";
+        return date.substring(0, 4);
+    }
+
+    /**
+     * 地区文本，优先取制片国家名称，其次原产国代码，无则返回空串。
+     */
+    public String getArea() {
+        if (tmdbDetail == null) return "";
+        if (tmdbDetail.has("production_countries") && tmdbDetail.get("production_countries").isJsonArray()) {
+            List<String> names = new ArrayList<>();
+            for (JsonElement e : tmdbDetail.getAsJsonArray("production_countries")) {
+                if (!e.isJsonObject()) continue;
+                JsonObject obj = e.getAsJsonObject();
+                String name = readString(obj, "name");
+                if (!TextUtils.isEmpty(name)) names.add(name);
+                if (names.size() >= 2) break;
+            }
+            if (!names.isEmpty()) return TextUtils.join(" / ", names);
+        }
+        if (tmdbDetail.has("origin_country") && tmdbDetail.get("origin_country").isJsonArray()) {
+            List<String> codes = new ArrayList<>();
+            for (JsonElement e : tmdbDetail.getAsJsonArray("origin_country")) {
+                if (e.isJsonNull()) continue;
+                String code = e.getAsString();
+                if (!TextUtils.isEmpty(code)) codes.add(code);
+                if (codes.size() >= 2) break;
+            }
+            if (!codes.isEmpty()) return TextUtils.join(" / ", codes);
+        }
+        return "";
+    }
+
+    private String readString(JsonObject object, String key) {
+        if (object == null || !object.has(key) || object.get(key).isJsonNull()) return "";
+        return object.get(key).getAsString();
+    }
+
+    /**
      * 获取剧照列表（backdrops）。
      */
     public List<String> getPhotos() {

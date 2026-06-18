@@ -748,6 +748,8 @@
     <string name="dialog_tmdb_site_manage">选择站点</string>
     <string name="dialog_tmdb_reset_default">恢复默认</string>
     <string name="tmdb_cast_label">演员</string>
+    <string name="tmdb_loading_detail">正在加载剧集信息...</string>
+    <string name="tmdb_loading_episodes">正在加载剧集信息...</string>
     <string name="tmdb_powered_by">数据来源：TMDB</string>
     <string name="tmdb_photos_label">剧照</string>
     <string name="tmdb_crew_label">主创团队</string>

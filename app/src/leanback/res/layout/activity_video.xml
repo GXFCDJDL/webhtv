@@ -160,12 +160,29 @@
 
     </androidx.appcompat.widget.LinearLayoutCompat>
 
+    <!-- TMDB 简介：仅 TMDB 模式显示，置于站源行下方 -->
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/tmdbOverview"
+        style="@style/Video.ContextText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/row1"
+        android:layout_alignStart="@+id/name"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="24dp"
+        android:ellipsize="end"
+        android:maxLines="3"
+        android:textColor="@color/white"
+        android:textSize="16sp"
+        android:visibility="gone"
+        tools:text="简介：这是一段剧情简介……" />
+
     <com.google.android.material.textview.MaterialTextView
         android:id="@+id/director"
         style="@style/Video.ContextText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@+id/row1"
+        android:layout_below="@+id/tmdbOverview"
         android:layout_alignStart="@+id/name"
         android:layout_marginTop="6dp"
         android:layout_marginEnd="24dp"
@@ -312,17 +329,51 @@
                 android:paddingEnd="24dp"
                 android:visibility="gone" />
 
-            <!-- 选集列表 - 改为横向滚动 -->
-            <androidx.leanback.widget.HorizontalGridView
-                android:id="@+id/episode"
+            <!-- 选集列表容器 - 支持TMDB加载动画 -->
+            <FrameLayout
+                android:id="@+id/episodeContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
-                android:clipChildren="false"
-                android:clipToPadding="false"
-                android:paddingStart="24dp"
-                android:paddingEnd="24dp"
-                android:visibility="gone" />
+                android:visibility="gone">
+
+                <!-- 选集列表 - 改为横向滚动 -->
+                <androidx.leanback.widget.HorizontalGridView
+                    android:id="@+id/episode"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
+                    android:paddingStart="24dp"
+                    android:paddingEnd="24dp" />
+
+                <!-- TMDB加载指示器 -->
+                <LinearLayout
+                    android:id="@+id/episodeLoadingIndicator"
+                    android:layout_width="match_parent"
+                    android:layout_height="160dp"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingStart="24dp"
+                    android:paddingEnd="24dp"
+                    android:visibility="gone">
+
+                    <ProgressBar
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:indeterminateTint="#FFFFFF" />
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/tmdb_loading_episodes"
+                        android:textColor="#CCCCCC"
+                        android:textSize="14sp" />
+
+                </LinearLayout>
+
+            </FrameLayout>
         <!-- TMDB 演员 -->
         <com.google.android.material.textview.MaterialTextView
             android:id="@+id/tmdbCastLabel"
@@ -463,4 +514,38 @@
         </androidx.appcompat.widget.LinearLayoutCompat>
 
     </androidx.core.widget.NestedScrollView>
+
+    <!-- TMDB详情加载遮罩：盖住原版详情页，避免先显示原始UI再切换到TMDB UI -->
+    <FrameLayout
+        android:id="@+id/tmdbDetailLoading"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/transparent"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ProgressBar
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:indeterminateTint="@color/white" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/tmdb_loading_detail"
+                android:textColor="@color/white"
+                android:textSize="16sp" />
+
+        </LinearLayout>
+
+    </FrameLayout>
 </com.fongmi.android.tv.ui.custom.ProgressLayout>

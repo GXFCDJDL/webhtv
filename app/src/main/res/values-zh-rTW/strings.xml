@@ -684,6 +684,8 @@
     <string name="dialog_tmdb_site_manage">選擇站點</string>
     <string name="dialog_tmdb_reset_default">恢復默認</string>
     <string name="tmdb_cast_label">演員</string>
+    <string name="tmdb_loading_detail">正在載入劇集資訊...</string>
+    <string name="tmdb_loading_episodes">正在載入劇集資訊...</string>
     <string name="tmdb_powered_by">數據來源：TMDB</string>
     <string name="tmdb_photos_label">劇照</string>
     <string name="tmdb_crew_label">主創團隊</string>

@@ -108,6 +108,7 @@ import java.util.Objects;
 public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.Listener, TrackDialog.Listener, ArrayAdapter.OnClickListener, FlagAdapter.OnClickListener, EpisodeAdapter.OnClickListener, QualityAdapter.OnClickListener, QuickAdapter.OnClickListener, ParseAdapter.OnClickListener, Clock.Callback {
 
     private static final int SHORT_DRAMA_SCALE = 0; // 0=原始(适合TV), 4=裁剪(适合手机)
+    private static final int TMDB_DETAIL_LOAD_TIMEOUT = 3000;
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.getDefault());
 
     private ActivityVideoBinding mBinding;
@@ -137,6 +138,9 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
     private Runnable mR1;
     private Runnable mR2;
     private Runnable mR3;
+    private Runnable mTmdbDetailTimeout;
+    private boolean mTmdbDetailLoading;
+    private final java.util.Map<View, Integer> mTmdbDetailVisibility = new java.util.HashMap<>();
 
     // TMDB 模式相关字段
     private com.fongmi.android.tv.ui.helper.TmdbUIAdapter mTmdbUIAdapter;
@@ -387,6 +391,7 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
         mR2 = this::updateFocus;
         mR3 = this::setTraffic;
         mR4 = this::showEmpty;
+        mTmdbDetailTimeout = this::showTmdbDetailFallback;
         SpiderDebug.log("video-flow", "initView state ready cost=%dms", System.currentTimeMillis() - start);
         checkCast();
         SpiderDebug.log("video-flow", "initView preview ready cost=%dms", System.currentTimeMillis() - start);
@@ -598,6 +603,7 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
     private void setDetail(Vod item) {
         item.checkPic(getPic());
         item.checkName(getName());
+        boolean loadTmdbDetail = shouldLoadTmdbDetail();
         mBinding.progressLayout.showContent();
         mBinding.name.setText(item.getName());
         mFlagAdapter.addAll(item.getFlags());
@@ -608,6 +614,7 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
         checkKeepImg();
         setText(item);
         updateKeep();
+        if (loadTmdbDetail) showTmdbDetailLoading();
 
         // TMDB 增强：自动匹配并增强 Vod
         if (mTmdbUIAdapter != null && mTmdbUIAdapter.isReady()) {
@@ -618,6 +625,106 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
                 mTmdbUIAdapter.autoMatch(item.getName(), item);
             }
         }
+    }
+
+    private boolean shouldLoadTmdbDetail() {
+        return mTmdbUIAdapter != null && mTmdbUIAdapter.isReady();
+    }
+
+    private void showTmdbDetailLoading() {
+        mTmdbDetailLoading = true;
+        mTmdbDetailVisibility.clear();
+        hideTmdbDetailContent(mBinding.name, mBinding.remark, mBinding.row1, mBinding.tmdbOverview, mBinding.director, mBinding.actor, mBinding.row2, mBinding.scroll);
+        mBinding.tmdbDetailLoading.animate().cancel();
+        mBinding.tmdbDetailLoading.setAlpha(1f);
+        mBinding.tmdbDetailLoading.setVisibility(View.VISIBLE);
+        App.removeCallbacks(mTmdbDetailTimeout);
+        App.post(mTmdbDetailTimeout, TMDB_DETAIL_LOAD_TIMEOUT);
+        SpiderDebug.log("tmdb-tv", "detail loading overlay show");
+    }
+
+    private void hideTmdbDetailContent(View... views) {
+        for (View view : views) {
+            if (view == null) continue;
+            mTmdbDetailVisibility.put(view, view.getVisibility());
+            view.setVisibility(View.INVISIBLE);
+        }
+    }
+
+    private void showTmdbDetailComplete() {
+        showTmdbDetailComplete(false);
+    }
+
+    private void showTmdbDetailComplete(boolean tmdbSuccess) {
+        if (!mTmdbDetailLoading) return;
+        mTmdbDetailLoading = false;
+        App.removeCallbacks(mTmdbDetailTimeout);
+
+        // 恢复被隐藏的内容区到原始可见性
+        for (java.util.Map.Entry<View, Integer> entry : mTmdbDetailVisibility.entrySet()) {
+            View view = entry.getKey();
+            if (view == null) continue;
+            view.setVisibility(entry.getValue());
+        }
+        mTmdbDetailVisibility.clear();
+
+        // TMDB 成功：精简信息区（去集数/演员/简介按钮），年份地区简介取 TMDB
+        if (tmdbSuccess) applyTmdbDetailFields();
+
+        // 内容淡入
+        View scroll = mBinding.scroll;
+        if (scroll != null && scroll.getVisibility() == View.VISIBLE) {
+            scroll.setAlpha(0f);
+            scroll.animate().alpha(1f).setDuration(200).start();
+        }
+
+        // 隐藏 loading 遮罩
+        mBinding.tmdbDetailLoading.animate().cancel();
+        mBinding.tmdbDetailLoading.animate()
+                .alpha(0f)
+                .setDuration(200)
+                .withEndAction(() -> {
+                    mBinding.tmdbDetailLoading.setVisibility(View.GONE);
+                    mBinding.tmdbDetailLoading.setAlpha(1f);
+                })
+                .start();
+        SpiderDebug.log("tmdb-tv", "detail loading overlay hide success=%s", tmdbSuccess);
+    }
+
+    private void applyTmdbDetailFields() {
+        // 去掉集数、演员、简介按钮
+        mBinding.remark.setVisibility(View.GONE);
+        mBinding.actor.setVisibility(View.GONE);
+        mBinding.content.setVisibility(View.GONE);
+
+        // 年份、地区、类型取 TMDB
+        if (mTmdbUIAdapter != null) {
+            String year = mTmdbUIAdapter.getYear();
+            String area = mTmdbUIAdapter.getArea();
+            String genres = mTmdbUIAdapter.getGenresText();
+            if (!TextUtils.isEmpty(year)) setText(mBinding.year, R.string.detail_year, year);
+            if (!TextUtils.isEmpty(area)) setText(mBinding.area, R.string.detail_area, area);
+            if (!TextUtils.isEmpty(genres)) setText(mBinding.type, R.string.detail_type, genres);
+        }
+
+        // 简介移到站源行下方显示（内容来自已 enrich 的 content tag）
+        Object desc = mBinding.content.getTag();
+        String overview = desc == null ? "" : desc.toString();
+        if (!TextUtils.isEmpty(overview)) {
+            mBinding.tmdbOverview.setText(getString(R.string.detail_content, overview));
+            mBinding.tmdbOverview.setVisibility(View.VISIBLE);
+        } else {
+            mBinding.tmdbOverview.setVisibility(View.GONE);
+        }
+
+        // 简介按钮隐藏后，修正焦点链：视频右移到收藏
+        mBinding.video.setNextFocusRightId(R.id.keep);
+    }
+
+    private void showTmdbDetailFallback() {
+        if (!mTmdbDetailLoading) return;
+        SpiderDebug.log("tmdb-tv", "detail loading overlay timeout fallback");
+        showTmdbDetailComplete();
     }
 
     private void setText(Vod item) {
@@ -725,17 +832,38 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
     }
 
     private void setEpisodeAdapter(List<Episode> items, boolean scrollToCurrent) {
-        mBinding.episode.setVisibility(items.isEmpty() ? View.GONE : View.VISIBLE);
+        boolean isEmpty = items.isEmpty();
+        mBinding.episodeContainer.setVisibility(isEmpty ? View.GONE : View.VISIBLE);
         mBinding.control.action.episodes.setVisibility(items.size() < 2 ? View.GONE : View.VISIBLE);
 
         // 先添加数据，让适配器检测是否有TMDB数据
         mEpisodeAdapter.addAll(items);
 
         // 根据设置决定是否使用TMDB卡片模式
-        mEpisodeAdapter.setUseTmdbCard(Setting.isTmdbEnabled());
+        boolean useTmdbCard = Setting.isTmdbEnabled();
+        mEpisodeAdapter.setUseTmdbCard(useTmdbCard);
 
         // 横向滚动，所有模式都使用1列
         mEpisodeAdapter.setColumn(1);
+
+        // 如果是TMDB卡片模式，检查是否所有剧集都有TMDB数据
+        boolean hasTmdbData = false;
+        if (useTmdbCard && !isEmpty) {
+            hasTmdbData = items.stream().anyMatch(ep -> ep.getTmdbEpisode() != null);
+        }
+
+        // 控制加载指示器和选集列表的显示
+        if (useTmdbCard && !hasTmdbData && !isEmpty) {
+            // TMDB模式但数据未加载完成：显示加载中，隐藏列表
+            mBinding.episodeLoadingIndicator.setVisibility(View.VISIBLE);
+            mBinding.episode.setVisibility(View.INVISIBLE);
+            mBinding.episode.setAlpha(0f);
+        } else {
+            // 普通模式或TMDB数据已加载：隐藏加载中，显示列表
+            mBinding.episodeLoadingIndicator.setVisibility(View.GONE);
+            mBinding.episode.setVisibility(View.VISIBLE);
+            mBinding.episode.setAlpha(1f);
+        }
 
         setArrayAdapter(items.size());
         updateFocus();
@@ -1535,7 +1663,25 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
         items.forEach(item -> mFlagAdapter.getItems().stream()
                 .filter(item::equals).findFirst().ifPresentOrElse(target -> {
                     target.mergeEpisodes(item.getEpisodes(), mHistory.isRevSort());
-                    if (target.equals(activated)) setEpisodeAdapter(target.getEpisodes());
+                    if (target.equals(activated)) {
+                        // 检查是否是TMDB数据更新
+                        boolean useTmdbCard = Setting.isTmdbEnabled();
+                        boolean hasTmdbData = useTmdbCard && item.getEpisodes().stream().anyMatch(ep -> ep.getTmdbEpisode() != null);
+
+                        if (useTmdbCard && hasTmdbData && mBinding.episodeLoadingIndicator.getVisibility() == View.VISIBLE) {
+                            // TMDB数据加载完成，执行淡入动画
+                            setEpisodeAdapter(target.getEpisodes());
+                            mBinding.episodeLoadingIndicator.setVisibility(View.GONE);
+                            mBinding.episode.setVisibility(View.VISIBLE);
+                            mBinding.episode.animate()
+                                    .alpha(1f)
+                                    .setDuration(300)
+                                    .start();
+                        } else {
+                            // 普通更新或初始加载
+                            setEpisodeAdapter(target.getEpisodes());
+                        }
+                    }
                 }, () -> mFlagAdapter.add(item)));
     }
 
@@ -1675,6 +1821,7 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
             updateVod(event.getVod());
             // 绑定 TMDB 数据到 UI
             bindTmdbData();
+            if (mTmdbDetailLoading && (mTmdbUIAdapter == null || !mTmdbUIAdapter.isLoaded())) showTmdbDetailComplete();
         }
         else if (event.getType() == RefreshEvent.Type.SUBTITLE) player().setSub(Sub.from(event.getPath()));
         else if (event.getType() == RefreshEvent.Type.DANMAKU) player().setDanmaku(Danmaku.from(event.getPath()));
@@ -1793,6 +1940,9 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
 
         // 设置背景幻灯片
         setupBackdropSlideshow(photos);
+
+        // TMDB 数据全部绑定完成，一次性揭开遮罩
+        showTmdbDetailComplete(true);
     }
 
     private void setupBackdropSlideshow(java.util.List<String> photos) {
@@ -2308,6 +2458,7 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
         stopBackdropAutoScroll();
         RefreshEvent.keep();
         App.removeCallbacks(mR1, mR2, mR3, mR4);
+        App.removeCallbacks(mTmdbDetailTimeout);
         mViewModel.getResult().removeObserver(mObserveDetail);
         mViewModel.getPlayer().removeObserver(mObservePlayer);
         mViewModel.getSearch().removeObserver(mObserveSearch);

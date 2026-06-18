@@ -768,6 +768,8 @@
     <string name="dialog_tmdb_site_manage">Select sources</string>
     <string name="dialog_tmdb_reset_default">Reset to default</string>
     <string name="tmdb_cast_label">Cast</string>
+    <string name="tmdb_loading_detail">Loading details…</string>
+    <string name="tmdb_loading_episodes">Loading episodes...</string>
     <string name="tmdb_powered_by">Powered by TMDB</string>
     <string name="tmdb_photos_label">Backdrops</string>
     <string name="tmdb_crew_label">Crew</string>
