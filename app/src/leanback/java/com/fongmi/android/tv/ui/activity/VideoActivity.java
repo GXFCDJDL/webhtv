@@ -108,7 +108,7 @@ import java.util.Objects;
 public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.Listener, TrackDialog.Listener, ArrayAdapter.OnClickListener, FlagAdapter.OnClickListener, EpisodeAdapter.OnClickListener, QualityAdapter.OnClickListener, QuickAdapter.OnClickListener, ParseAdapter.OnClickListener, Clock.Callback {
 
     private static final int SHORT_DRAMA_SCALE = 0; // 0=原始(适合TV), 4=裁剪(适合手机)
-    private static final int TMDB_DETAIL_LOAD_TIMEOUT = 3000;
+    private static final int TMDB_DETAIL_LOAD_TIMEOUT = 8000;
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.getDefault());
 
     private ActivityVideoBinding mBinding;
@@ -140,6 +140,7 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
     private Runnable mR3;
     private Runnable mTmdbDetailTimeout;
     private boolean mTmdbDetailLoading;
+    private boolean mTmdbDetailRevealed;
     private final java.util.Map<View, Integer> mTmdbDetailVisibility = new java.util.HashMap<>();
 
     // TMDB 模式相关字段
@@ -633,6 +634,7 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
 
     private void showTmdbDetailLoading() {
         mTmdbDetailLoading = true;
+        mTmdbDetailRevealed = false;
         mTmdbDetailVisibility.clear();
         hideTmdbDetailContent(mBinding.name, mBinding.remark, mBinding.row1, mBinding.tmdbOverview, mBinding.director, mBinding.actor, mBinding.row2, mBinding.scroll);
         mBinding.tmdbDetailLoading.animate().cancel();
@@ -651,12 +653,16 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
         }
     }
 
-    private void showTmdbDetailComplete() {
-        showTmdbDetailComplete(false);
+    // TMDB 数据成功返回：揭开内容（仅一次）并应用 TMDB 字段（每次都应用）
+    private void finishTmdbDetail() {
+        revealTmdbDetail();
+        applyTmdbDetailFields();
     }
 
-    private void showTmdbDetailComplete(boolean tmdbSuccess) {
-        if (!mTmdbDetailLoading) return;
+    // 揭开遮罩、恢复内容可见性，幂等（超时或数据到达都会调用，只执行一次）
+    private void revealTmdbDetail() {
+        if (mTmdbDetailRevealed) return;
+        mTmdbDetailRevealed = true;
         mTmdbDetailLoading = false;
         App.removeCallbacks(mTmdbDetailTimeout);
 
@@ -667,9 +673,6 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
             view.setVisibility(entry.getValue());
         }
         mTmdbDetailVisibility.clear();
-
-        // TMDB 成功：精简信息区（去集数/演员/简介按钮），年份地区简介取 TMDB
-        if (tmdbSuccess) applyTmdbDetailFields();
 
         // 内容淡入
         View scroll = mBinding.scroll;
@@ -688,11 +691,11 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
                     mBinding.tmdbDetailLoading.setAlpha(1f);
                 })
                 .start();
-        SpiderDebug.log("tmdb-tv", "detail loading overlay hide success=%s", tmdbSuccess);
+        SpiderDebug.log("tmdb-tv", "detail loading overlay hide");
     }
 
     private void applyTmdbDetailFields() {
-        // 去掉集数、演员、简介按钮
+        // 去掉集数、演员；简介按钮默认隐藏（仅简介显示不全时再显示）
         mBinding.remark.setVisibility(View.GONE);
         mBinding.actor.setVisibility(View.GONE);
         mBinding.content.setVisibility(View.GONE);
@@ -713,18 +716,47 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
         if (!TextUtils.isEmpty(overview)) {
             mBinding.tmdbOverview.setText(getString(R.string.detail_content, overview));
             mBinding.tmdbOverview.setVisibility(View.VISIBLE);
+            // 布局完成后检测是否截断，截断则显示简介按钮
+            mBinding.tmdbOverview.post(this::updateTmdbOverviewButton);
         } else {
             mBinding.tmdbOverview.setVisibility(View.GONE);
         }
 
-        // 简介按钮隐藏后，修正焦点链：视频右移到收藏
+        // 简介按钮默认隐藏，焦点先把视频右移到收藏（按钮显示时再修正）
         mBinding.video.setNextFocusRightId(R.id.keep);
     }
 
+    private void updateTmdbOverviewButton() {
+        if (isFinishing() || isDestroyed()) return;
+        TextView view = mBinding.tmdbOverview;
+        // 按可用高度算出能容纳的行数，设置 maxLines 后 ellipsize 才会生效
+        int height = view.getHeight();
+        int lineHeight = view.getLineHeight();
+        if (height > 0 && lineHeight > 0) {
+            int maxLines = Math.max(1, height / lineHeight);
+            if (view.getMaxLines() != maxLines) {
+                view.setMaxLines(maxLines);
+                view.post(this::updateTmdbOverviewButton);
+                return;
+            }
+        }
+        boolean truncated = isTextTruncated(view);
+        mBinding.content.setVisibility(truncated ? View.VISIBLE : View.GONE);
+        mBinding.video.setNextFocusRightId(truncated ? R.id.content : R.id.keep);
+    }
+
+    private boolean isTextTruncated(TextView view) {
+        android.text.Layout layout = view.getLayout();
+        if (layout == null) return false;
+        int lines = layout.getLineCount();
+        if (lines <= 0) return false;
+        return layout.getEllipsisCount(lines - 1) > 0;
+    }
+
     private void showTmdbDetailFallback() {
-        if (!mTmdbDetailLoading) return;
+        if (mTmdbDetailRevealed) return;
         SpiderDebug.log("tmdb-tv", "detail loading overlay timeout fallback");
-        showTmdbDetailComplete();
+        revealTmdbDetail();
     }
 
     private void setText(Vod item) {
@@ -1821,7 +1853,8 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
             updateVod(event.getVod());
             // 绑定 TMDB 数据到 UI
             bindTmdbData();
-            if (mTmdbDetailLoading && (mTmdbUIAdapter == null || !mTmdbUIAdapter.isLoaded())) showTmdbDetailComplete();
+            // 未匹配到 TMDB 数据：直接揭开原版 UI
+            if (mTmdbUIAdapter == null || !mTmdbUIAdapter.isLoaded()) revealTmdbDetail();
         }
         else if (event.getType() == RefreshEvent.Type.SUBTITLE) player().setSub(Sub.from(event.getPath()));
         else if (event.getType() == RefreshEvent.Type.DANMAKU) player().setDanmaku(Danmaku.from(event.getPath()));
@@ -1941,8 +1974,8 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
         // 设置背景幻灯片
         setupBackdropSlideshow(photos);
 
-        // TMDB 数据全部绑定完成，一次性揭开遮罩
-        showTmdbDetailComplete(true);
+        // TMDB 数据全部绑定完成，揭开遮罩并应用 TMDB 字段
+        finishTmdbDetail();
     }
 
     private void setupBackdropSlideshow(java.util.List<String> photos) {

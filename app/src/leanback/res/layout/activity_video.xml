@@ -160,29 +160,12 @@
 
     </androidx.appcompat.widget.LinearLayoutCompat>
 
-    <!-- TMDB 简介：仅 TMDB 模式显示，置于站源行下方 -->
-    <com.google.android.material.textview.MaterialTextView
-        android:id="@+id/tmdbOverview"
-        style="@style/Video.ContextText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/row1"
-        android:layout_alignStart="@+id/name"
-        android:layout_marginTop="6dp"
-        android:layout_marginEnd="24dp"
-        android:ellipsize="end"
-        android:maxLines="3"
-        android:textColor="@color/white"
-        android:textSize="16sp"
-        android:visibility="gone"
-        tools:text="简介：这是一段剧情简介……" />
-
     <com.google.android.material.textview.MaterialTextView
         android:id="@+id/director"
         style="@style/Video.ContextText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@+id/tmdbOverview"
+        android:layout_below="@+id/row1"
         android:layout_alignStart="@+id/name"
         android:layout_marginTop="6dp"
         android:layout_marginEnd="24dp"
@@ -191,6 +174,25 @@
         android:textColor="@color/white"
         android:textSize="16sp"
         tools:text="導演：FongMi" />
+
+    <!-- TMDB 简介：仅 TMDB 模式显示，撑满站源/导演行与底部按钮之间的空间 -->
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/tmdbOverview"
+        style="@style/Video.ContextText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/director"
+        android:layout_above="@+id/row2"
+        android:layout_alignStart="@+id/name"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="24dp"
+        android:layout_marginBottom="8dp"
+        android:ellipsize="end"
+        android:gravity="top"
+        android:textColor="@color/white"
+        android:textSize="16sp"
+        android:visibility="gone"
+        tools:text="简介：这是一段剧情简介……" />
 
     <com.google.android.material.textview.MaterialTextView
         android:id="@+id/actor"
