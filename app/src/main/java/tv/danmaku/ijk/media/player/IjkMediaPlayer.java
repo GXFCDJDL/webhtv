@@ -477,7 +477,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         }
         native_init();
         setDot(0);
-        native_setLogLevel(8);
+        native_setLogLevel(IJK_LOG_SILENT);
         mIsNativeInitialized = true;
     }
 
@@ -846,16 +846,24 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     }
 
     public void setDataSource(String str, Map<String, String> map) {
-        if (map != null && !map.isEmpty()) {
-            StringBuilder builder = new StringBuilder();
-            for (Map.Entry<String, String> entry : map.entrySet()) {
-                if (TextUtils.isEmpty(entry.getKey())) continue;
-                builder.append(entry.getKey()).append(":");
-                if (!TextUtils.isEmpty(entry.getValue())) builder.append(entry.getValue());
-                builder.append("\r\n");
-            }
-            if (builder.length() > 0) setOption(OPT_CATEGORY_FORMAT, "headers", builder.toString());
+        if (map == null || map.isEmpty()) {
+            setDataSource(str);
+            return;
         }
+        StringBuilder builder = new StringBuilder();
+        for (Map.Entry<String, String> entry : map.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+            if (TextUtils.isEmpty(key)) continue;
+            if ("User-Agent".equalsIgnoreCase(key)) {
+                if (!TextUtils.isEmpty(value)) setOption(OPT_CATEGORY_FORMAT, "user_agent", value);
+                continue;
+            }
+            builder.append(key).append(":");
+            if (!TextUtils.isEmpty(value)) builder.append(value);
+            builder.append("\r\n");
+        }
+        if (builder.length() > 0) setOption(OPT_CATEGORY_FORMAT, "headers", builder.toString());
         setDataSource(str);
     }
 

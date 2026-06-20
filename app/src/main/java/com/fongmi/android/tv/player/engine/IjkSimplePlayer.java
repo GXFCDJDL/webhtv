@@ -21,7 +21,6 @@ import androidx.media3.common.util.UnstableApi;
 
 import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.player.exo.ExoUtil;
-import com.github.catvod.crawler.SpiderDebug;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -360,15 +359,12 @@ class IjkSimplePlayer extends SimpleBasePlayer implements IMediaPlayer.Listener 
             if (surfaceHolder != null) {
                 surface = surfaceHolder.getSurface();
                 if (surface != null && surface.isValid()) {
-                    SpiderDebug.log("ijk", "bind display holder=%s surface=%s", surfaceHolder, surface);
                     ijk.setDisplay(surfaceHolder);
                 }
             } else if (surface != null && surface.isValid()) {
-                SpiderDebug.log("ijk", "bind surface surface=%s", surface);
                 ijk.setSurface(surface);
             }
-        } catch (Throwable e) {
-            SpiderDebug.log("ijk", "bind surface failed: %s", e.getMessage());
+        } catch (Throwable ignored) {
         }
     }
 

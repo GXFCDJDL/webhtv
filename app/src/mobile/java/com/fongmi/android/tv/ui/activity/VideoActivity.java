@@ -1656,6 +1656,12 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
     }
 
     @Override
+    protected void onPlayerRebuilt() {
+        setPlayerKernel();
+        setDecode();
+    }
+
+    @Override
     protected void onTracksChanged() {
         android.util.Log.d("VideoActivity", "onTracksChanged: setting Clock callback");
         setTrackVisible();

@@ -373,6 +373,12 @@ public class CastActivity extends PlaybackActivity implements CustomKeyDownVod.L
     }
 
     @Override
+    protected void onPlayerRebuilt() {
+        setPlayerKernel();
+        setDecode();
+    }
+
+    @Override
     protected void onTracksChanged() {
         setTrackVisible();
     }

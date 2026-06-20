@@ -1942,6 +1942,12 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
     }
 
     @Override
+    protected void onPlayerRebuilt() {
+        setPlayerKernel();
+        setDecode();
+    }
+
+    @Override
     protected void onTracksChanged() {
         setTrackVisible();
         mClock.setCallback(this);

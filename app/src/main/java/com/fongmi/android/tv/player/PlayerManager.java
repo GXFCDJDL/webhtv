@@ -73,7 +73,7 @@ public class PlayerManager implements ParseCallback {
     private boolean[] playerFallbackTried;
 
     public PlayerManager(Callback callback) {
-        this.runnable = () -> callback.onError(ResUtil.getString(R.string.error_play_timeout));
+        this.runnable = this::onPlayTimeout;
         this.playerType = PlayerSetting.getPlayer();
         this.playerFallbackTried = new boolean[PLAYER_FALLBACK_ORDER.length];
         this.engine = buildEngine(playerType, PlayerEngine.HARD);
@@ -438,6 +438,7 @@ public class PlayerManager implements ParseCallback {
     public void switchPlayer(int type) {
         if (engine == null || player == null) return;
         type = PlayerSetting.sanitizePlayer(type);
+        type = resolveAvailablePlayer(type);
         if (type == playerType) return;
         resetPlayerFallback();
         switchEngine(type, true, true, true);
@@ -508,6 +509,7 @@ public class PlayerManager implements ParseCallback {
 
     private void setMediaItem(long timeout) {
         if (spec == null || spec.getUrl() == null) return;
+        if (!ensurePlayerAvailableForPlayback()) return;
         int seq = ++prepareSeq;
         if (LocalProxyDebug.shouldAwaitReady(spec.getUrl())) {
             awaitLocalProxyAndSetMediaItem(seq, timeout);
@@ -686,6 +688,12 @@ public class PlayerManager implements ParseCallback {
         }
     };
 
+    private void onPlayTimeout() {
+        PlaybackException e = new PlaybackException(ResUtil.getString(R.string.error_play_timeout), null, PlaybackException.ERROR_CODE_TIMEOUT);
+        if (fallbackPlayer(e)) return;
+        callback.onError(ResUtil.getString(R.string.error_play_timeout));
+    }
+
     private boolean retryLocalProxy(PlaybackException e) {
         if (spec == null || !LocalProxyDebug.isLocalProxyUrl(spec.getUrl())) return false;
         if (!LocalProxyDebug.isConnectionRefused(e)) return false;
@@ -705,7 +713,10 @@ public class PlayerManager implements ParseCallback {
         if (spec == null || spec.getUrl() == null || engine == null) return false;
         int next = nextFallbackPlayer();
         if (next == PlayerSetting.NONE) return false;
-        SpiderDebug.log("player", "fallback player from=%s to=%s spec=%s cause=%s", getPlayerText(playerType), getPlayerText(next), debugSpec(), causeChain(e));
+        String from = getPlayerText(playerType);
+        String to = getPlayerText(next);
+        SpiderDebug.log("player", "fallback player from=%s to=%s spec=%s cause=%s", from, to, debugSpec(), causeChain(e));
+        Notify.show(ResUtil.getString(R.string.error_play_fallback, from, to));
         App.removeCallbacks(runnable);
         retry = 0;
         localProxyRetry = 0;
@@ -713,11 +724,25 @@ public class PlayerManager implements ParseCallback {
         return true;
     }
 
+    private boolean ensurePlayerAvailableForPlayback() {
+        if (PlayerSetting.isPlayerAvailable(playerType)) return true;
+        int from = playerType;
+        int next = nextFallbackPlayer();
+        if (next == PlayerSetting.NONE) {
+            callback.onError(ResUtil.getString(R.string.error_play_ijk_unavailable));
+            return false;
+        }
+        showUnavailablePlayer(from, next);
+        switchEngine(next, false, false, true);
+        return false;
+    }
+
     private int nextFallbackPlayer() {
         markPlayerFallbackTried(playerType);
         for (int type : PLAYER_FALLBACK_ORDER) {
             if (type == playerType || isPlayerFallbackTried(type)) continue;
             markPlayerFallbackTried(type);
+            if (!PlayerSetting.isPlayerAvailable(type)) continue;
             return type;
         }
         return PlayerSetting.NONE;
@@ -729,6 +754,24 @@ public class PlayerManager implements ParseCallback {
             return PLAYER_FALLBACK_ORDER[(i + 1) % PLAYER_FALLBACK_ORDER.length];
         }
         return PlayerSetting.EXO;
+    }
+
+    private int resolveAvailablePlayer(int type) {
+        if (PlayerSetting.isPlayerAvailable(type)) return type;
+        int next = nextPlayer(type);
+        while (next != type) {
+            if (PlayerSetting.isPlayerAvailable(next)) {
+                showUnavailablePlayer(type, next);
+                return next;
+            }
+            next = nextPlayer(next);
+        }
+        return playerType;
+    }
+
+    private void showUnavailablePlayer(int from, int to) {
+        SpiderDebug.log("player", "player unavailable from=%s to=%s package=%s", getPlayerText(from), getPlayerText(to), App.get().getPackageName());
+        Notify.show(ResUtil.getString(R.string.error_play_ijk_unavailable_switch, getPlayerText(to)));
     }
 
     private void resetPlayerFallback() {

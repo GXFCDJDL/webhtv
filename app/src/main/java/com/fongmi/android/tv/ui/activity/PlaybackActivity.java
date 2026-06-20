@@ -135,6 +135,9 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
     protected void onPrepare() {
     }
 
+    protected void onPlayerRebuilt() {
+    }
+
     protected void onTracksChanged() {
     }
 
@@ -356,7 +359,10 @@ public abstract class PlaybackActivity extends BaseActivity implements MediaCont
 
         @Override
         public void onPlayerRebuild(Player player) {
-            if (isOwner()) setRender();
+            if (isOwner()) {
+                setRender();
+                PlaybackActivity.this.onPlayerRebuilt();
+            }
         }
     };
 

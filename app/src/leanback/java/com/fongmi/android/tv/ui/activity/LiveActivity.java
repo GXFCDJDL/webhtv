@@ -490,6 +490,12 @@ public class LiveActivity extends PlaybackActivity implements GroupAdapter.OnCli
     }
 
     @Override
+    protected void onPlayerRebuilt() {
+        setPlayerKernel();
+        setDecode();
+    }
+
+    @Override
     protected void onTracksChanged() {
         setTrackVisible();
     }

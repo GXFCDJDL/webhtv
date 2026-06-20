@@ -23,10 +23,13 @@ import androidx.media3.common.util.UnstableApi;
 import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.player.exo.ExoUtil;
 import com.google.common.collect.ImmutableList;
+import com.google.common.net.HttpHeaders;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @UnstableApi
 class SystemSimplePlayer extends SimpleBasePlayer implements MediaPlayer.OnPreparedListener, MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListener, MediaPlayer.OnInfoListener, MediaPlayer.OnBufferingUpdateListener, MediaPlayer.OnVideoSizeChangedListener {
@@ -290,7 +293,7 @@ class SystemSimplePlayer extends SimpleBasePlayer implements MediaPlayer.OnPrepa
             playerError = null;
             mediaPlayer.reset();
             bindVideoOutput();
-            mediaPlayer.setDataSource(App.get(), mediaItem.localConfiguration.uri, ExoUtil.extractHeaders(mediaItem));
+            mediaPlayer.setDataSource(App.get(), mediaItem.localConfiguration.uri, headersWithRange());
             mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
             mediaPlayer.setScreenOnWhilePlaying(true);
             mediaPlayer.setLooping(repeatOne);
@@ -303,6 +306,12 @@ class SystemSimplePlayer extends SimpleBasePlayer implements MediaPlayer.OnPrepa
             loading = false;
             invalidateState();
         }
+    }
+
+    private Map<String, String> headersWithRange() {
+        Map<String, String> headers = new HashMap<>(ExoUtil.extractHeaders(mediaItem));
+        headers.putIfAbsent(HttpHeaders.RANGE, "bytes=0-");
+        return headers;
     }
 
     private void stopInternal(boolean resetState) {
@@ -416,6 +425,7 @@ class SystemSimplePlayer extends SimpleBasePlayer implements MediaPlayer.OnPrepa
     }
 
     private long safeDuration() {
+        if (!canQueryPlaybackPosition()) return C.TIME_UNSET;
         try {
             return mediaPlayer.getDuration();
         } catch (Throwable ignored) {
@@ -424,6 +434,7 @@ class SystemSimplePlayer extends SimpleBasePlayer implements MediaPlayer.OnPrepa
     }
 
     private long position() {
+        if (!canQueryPlaybackPosition()) return pendingSeekPositionMs == C.TIME_UNSET ? 0 : Math.max(0, pendingSeekPositionMs);
         try {
             return Math.max(0, mediaPlayer.getCurrentPosition());
         } catch (Throwable ignored) {
@@ -442,6 +453,10 @@ class SystemSimplePlayer extends SimpleBasePlayer implements MediaPlayer.OnPrepa
         } catch (Throwable ignored) {
             return false;
         }
+    }
+
+    private boolean canQueryPlaybackPosition() {
+        return playbackState == Player.STATE_READY || playbackState == Player.STATE_ENDED;
     }
 
     private int errorCode(int what) {
