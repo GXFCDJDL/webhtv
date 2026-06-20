@@ -1,5 +1,7 @@
 package com.fongmi.android.tv.ui.adapter;
 
+import android.content.Context;
+import android.graphics.drawable.Drawable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -9,6 +11,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.RequestBuilder;
 import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.bean.Episode;
 import com.fongmi.android.tv.bean.TmdbEpisode;
@@ -24,6 +27,13 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
 
     private static final int VIEW_TYPE_TEXT = 0;
     private static final int VIEW_TYPE_CARD = 1;
+    private static final int CARD_WIDTH_DP = 280;
+    private static final int CARD_HEIGHT_DP = 160;
+    private static final int GRID_CARD_HEIGHT_DP = 248;
+    private static final int CARD_MARGIN_END_DP = 12;
+    private static final String TMDB_IMAGE_SIZE_PATTERN = "(/t/p/)([^/]+)(/)";
+    private static final String PREFERRED_STILL_SIZE = "w1280";
+    private static final String FALLBACK_STILL_SIZE = "original";
 
     private final OnClickListener mListener;
     private final OnLongClickListener mLongClickListener;
@@ -244,11 +254,7 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
 
         // 加载剧照
         if (!tmdbEpisode.getStillUrl().isEmpty()) {
-            Glide.with(binding.still.getContext())
-                .load(tmdbEpisode.getStillUrl())
-                .placeholder(R.color.black)
-                .error(R.color.black)
-                .into(binding.still);
+            loadStill(binding, tmdbEpisode.getStillUrl());
         } else {
             binding.still.setImageResource(R.color.black);
         }
@@ -290,11 +296,11 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
 
     private void applyCardSize(AdapterEpisodeCardBinding binding) {
         ViewGroup.LayoutParams cardParams = binding.cardContainer.getLayoutParams();
-        cardParams.width = gridMode ? ViewGroup.LayoutParams.MATCH_PARENT : ResUtil.dp2px(280);
-        cardParams.height = ResUtil.dp2px(gridMode ? 248 : 160);
+        cardParams.width = gridMode ? ViewGroup.LayoutParams.MATCH_PARENT : ResUtil.dp2px(CARD_WIDTH_DP);
+        cardParams.height = ResUtil.dp2px(gridMode ? GRID_CARD_HEIGHT_DP : CARD_HEIGHT_DP);
         binding.cardContainer.setLayoutParams(cardParams);
         if (cardParams instanceof ViewGroup.MarginLayoutParams marginParams) {
-            marginParams.setMarginEnd(ResUtil.dp2px(12));
+            marginParams.setMarginEnd(ResUtil.dp2px(CARD_MARGIN_END_DP));
             marginParams.bottomMargin = gridMode ? ResUtil.dp2px(16) : 0;
             binding.cardContainer.setLayoutParams(marginParams);
         }
@@ -308,6 +314,60 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
                 ResUtil.dp2px(12),
                 ResUtil.dp2px(gridMode ? 14 : 12));
         binding.cardTitle.setTextSize(gridMode ? 18 : 18);
+    }
+
+    private void loadStill(AdapterEpisodeCardBinding binding, String url) {
+        Context context = binding.still.getContext();
+        int width = getCardWidth(binding);
+        int height = getCardHeight(binding);
+        String preferredUrl = tmdbImageUrl(url, PREFERRED_STILL_SIZE);
+        String fallbackUrl = tmdbImageUrl(url, FALLBACK_STILL_SIZE);
+
+        RequestBuilder<Drawable> request = Glide.with(context)
+                .load(preferredUrl)
+                .placeholder(R.color.black)
+                .centerCrop()
+                .override(width, height);
+        if (!preferredUrl.equals(fallbackUrl)) {
+            request.error(Glide.with(context)
+                    .load(fallbackUrl)
+                    .placeholder(R.color.black)
+                    .error(R.color.black)
+                    .centerCrop()
+                    .override(width, height));
+        } else {
+            request.error(R.color.black);
+        }
+        request.into(binding.still);
+    }
+
+    private int getCardWidth(AdapterEpisodeCardBinding binding) {
+        int width = binding.cardContainer.getWidth();
+        if (width > 0) return width;
+        ViewGroup.LayoutParams params = binding.cardContainer.getLayoutParams();
+        if (params != null && params.width > 0) return params.width;
+        return gridMode ? getGridCardWidth() : ResUtil.dp2px(CARD_WIDTH_DP);
+    }
+
+    private int getCardHeight(AdapterEpisodeCardBinding binding) {
+        int height = binding.cardContainer.getHeight();
+        if (height > 0) return height;
+        ViewGroup.LayoutParams params = binding.cardContainer.getLayoutParams();
+        if (params != null && params.height > 0) return params.height;
+        return ResUtil.dp2px(gridMode ? GRID_CARD_HEIGHT_DP : CARD_HEIGHT_DP);
+    }
+
+    private int getGridCardWidth() {
+        int minCardWidth = ResUtil.dp2px(CARD_WIDTH_DP);
+        int available = Math.max(ResUtil.dp2px(320), ResUtil.getScreenWidth() - ResUtil.dp2px(48));
+        int span = column > 1 ? column : Math.max(2, Math.min(6, available / minCardWidth));
+        return Math.max(minCardWidth, available / span - ResUtil.dp2px(CARD_MARGIN_END_DP));
+    }
+
+    private static String tmdbImageUrl(String url, String size) {
+        if (url == null || url.isEmpty()) return "";
+        String result = url.replaceFirst(TMDB_IMAGE_SIZE_PATTERN, "$1" + size + "$3");
+        return result.equals(url) ? url.replaceFirst("/(w\\d+|h\\d+|original)/", "/" + size + "/") : result;
     }
 
     private String getCardTitle(TmdbEpisode tmdbEpisode) {
