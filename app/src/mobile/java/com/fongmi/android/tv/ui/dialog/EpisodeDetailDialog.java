@@ -2,6 +2,8 @@ package com.fongmi.android.tv.ui.dialog;
 
 import android.app.Activity;
 import android.app.Dialog;
+import android.content.res.ColorStateList;
+import android.content.res.Configuration;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -28,6 +30,8 @@ import com.fongmi.android.tv.ui.adapter.EpisodeStillAdapter;
 import com.fongmi.android.tv.ui.adapter.TmdbPersonAdapter;
 import com.fongmi.android.tv.utils.ResUtil;
 import com.fongmi.android.tv.utils.Task;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.gson.JsonObject;
 
@@ -53,7 +57,9 @@ public class EpisodeDetailDialog {
         RecyclerView photoList = view.findViewById(R.id.photoList);
         TextView guestsTitle = view.findViewById(R.id.guestsTitle);
         RecyclerView guestsList = view.findViewById(R.id.guestsList);
+        boolean light = resolveLightTheme(activity);
 
+        applyTheme(view, light);
         bindBasicInfo(activity, tmdbEpisode, still, title, meta, overview);
         bindHorizontalList(photoList, 12);
         bindHorizontalList(guestsList, 12);
@@ -64,7 +70,7 @@ public class EpisodeDetailDialog {
         dialog.show();
         applyWindowSize(dialog);
 
-        loadEpisodeMedia(activity, tmdbEpisode, photoTitle, photoList, guestsTitle, guestsList);
+        loadEpisodeMedia(activity, tmdbEpisode, light, photoTitle, photoList, guestsTitle, guestsList);
     }
 
     private static void applyWindowSize(Dialog dialog) {
@@ -98,6 +104,43 @@ public class EpisodeDetailDialog {
         overview.setText(TextUtils.isEmpty(episode.getOverview()) ? "暂无简介" : episode.getOverview());
     }
 
+    private static void applyTheme(View view, boolean light) {
+        View root = view.findViewById(R.id.root);
+        MaterialCardView panel = view.findViewById(R.id.panel);
+        ImageView still = view.findViewById(R.id.still);
+        TextView title = view.findViewById(R.id.title);
+        TextView meta = view.findViewById(R.id.meta);
+        TextView overview = view.findViewById(R.id.overview);
+        TextView photoTitle = view.findViewById(R.id.photoTitle);
+        TextView guestsTitle = view.findViewById(R.id.guestsTitle);
+        MaterialButton close = view.findViewById(R.id.close);
+
+        int overlay = light ? 0x99F4F7FA : 0xB3000000;
+        int panelColor = light ? 0xFFF4F7FA : 0xFF2A2A2A;
+        int imageBg = light ? 0xFFE7EDF3 : 0xFF1A1A1A;
+        int primary = light ? 0xFF12202D : 0xFFFFFFFF;
+        int secondary = light ? 0x9912202D : 0xFFAAAAAA;
+        int body = light ? 0xCC12202D : 0xFFDDDDDD;
+        int stroke = light ? 0x33424B57 : 0xFF4A4A4A;
+        int control = light ? 0xFFE7EDF3 : 0xFF2A2A2A;
+
+        if (root != null) root.setBackgroundColor(overlay);
+        if (panel != null) {
+            panel.setCardBackgroundColor(panelColor);
+            panel.setStrokeColor(stroke);
+        }
+        if (still != null) still.setBackgroundColor(imageBg);
+        title.setTextColor(primary);
+        meta.setTextColor(secondary);
+        overview.setTextColor(body);
+        photoTitle.setTextColor(primary);
+        guestsTitle.setTextColor(primary);
+        close.setTextColor(primary);
+        close.setStrokeColor(ColorStateList.valueOf(stroke));
+        close.setBackgroundTintList(ColorStateList.valueOf(control));
+        close.setRippleColor(ColorStateList.valueOf(light ? 0x1F12202D : 0x33FFFFFF));
+    }
+
     private static void bindHorizontalList(RecyclerView view, int spacingDp) {
         view.setLayoutManager(new LinearLayoutManager(view.getContext(), LinearLayoutManager.HORIZONTAL, false));
         view.addItemDecoration(new RecyclerView.ItemDecoration() {
@@ -109,7 +152,7 @@ public class EpisodeDetailDialog {
         });
     }
 
-    private static void loadEpisodeMedia(FragmentActivity activity, TmdbEpisode episode, TextView photoTitle, RecyclerView photoList, TextView guestsTitle, RecyclerView guestsList) {
+    private static void loadEpisodeMedia(FragmentActivity activity, TmdbEpisode episode, boolean light, TextView photoTitle, RecyclerView photoList, TextView guestsTitle, RecyclerView guestsList) {
         if (episode.getTmdbId() == 0) return;
         Task.execute(() -> {
             try {
@@ -121,7 +164,7 @@ public class EpisodeDetailDialog {
                 List<TmdbPerson> guests = service.episodeGuests(episodeJson, config);
                 activity.runOnUiThread(() -> {
                     if (activity.isFinishing() || activity.isDestroyed()) return;
-                    bindMedia(activity, photos, guests, photoTitle, photoList, guestsTitle, guestsList);
+                    bindMedia(activity, photos, guests, light, photoTitle, photoList, guestsTitle, guestsList);
                 });
             } catch (Exception e) {
                 android.util.Log.w("EpisodeDetailDialog", "load episode detail failed", e);
@@ -129,7 +172,7 @@ public class EpisodeDetailDialog {
         });
     }
 
-    private static void bindMedia(FragmentActivity activity, List<String> photos, List<TmdbPerson> guests, TextView photoTitle, RecyclerView photoList, TextView guestsTitle, RecyclerView guestsList) {
+    private static void bindMedia(FragmentActivity activity, List<String> photos, List<TmdbPerson> guests, boolean light, TextView photoTitle, RecyclerView photoList, TextView guestsTitle, RecyclerView guestsList) {
         if (photos != null && !photos.isEmpty()) {
             photoTitle.setVisibility(View.VISIBLE);
             photoList.setVisibility(View.VISIBLE);
@@ -139,9 +182,15 @@ public class EpisodeDetailDialog {
             guestsTitle.setVisibility(View.VISIBLE);
             guestsList.setVisibility(View.VISIBLE);
             TmdbPersonAdapter adapter = new TmdbPersonAdapter(person -> TmdbPersonDialog.show(activity, person, null));
+            adapter.setLight(light);
             adapter.setItems(guests);
             guestsList.setAdapter(adapter);
         }
+    }
+
+    private static boolean resolveLightTheme(Activity activity) {
+        int night = activity.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        return Setting.resolveTmdbDetailLightTheme(Setting.getTmdbDetailTheme(), night == Configuration.UI_MODE_NIGHT_YES);
     }
 
     private static void showSimpleDialog(FragmentActivity activity, Episode episode) {

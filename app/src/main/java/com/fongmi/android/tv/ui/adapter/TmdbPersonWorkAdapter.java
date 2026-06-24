@@ -15,6 +15,7 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.bean.TmdbItem;
 import com.fongmi.android.tv.utils.Util;
+import com.google.android.material.card.MaterialCardView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +31,7 @@ public class TmdbPersonWorkAdapter extends RecyclerView.Adapter<TmdbPersonWorkAd
 
     private final List<TmdbItem> items = new ArrayList<>();
     private final Listener listener;
+    private boolean light;
 
     public TmdbPersonWorkAdapter(Listener listener) {
         this.listener = listener;
@@ -38,6 +40,11 @@ public class TmdbPersonWorkAdapter extends RecyclerView.Adapter<TmdbPersonWorkAd
     public void setItems(List<TmdbItem> values) {
         items.clear();
         if (values != null) items.addAll(values);
+        notifyDataSetChanged();
+    }
+
+    public void setLight(boolean light) {
+        this.light = light;
         notifyDataSetChanged();
     }
 
@@ -65,6 +72,7 @@ public class TmdbPersonWorkAdapter extends RecyclerView.Adapter<TmdbPersonWorkAd
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         TmdbItem item = items.get(position);
+        applyTheme(holder);
         holder.title.setText(item.getTitle());
 
         // 角色（饰 XXX 或职位）
@@ -114,6 +122,19 @@ public class TmdbPersonWorkAdapter extends RecyclerView.Adapter<TmdbPersonWorkAd
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onItemClick(item);
         });
+    }
+
+    private void applyTheme(ViewHolder holder) {
+        if (holder.itemView instanceof MaterialCardView card) {
+            card.setCardBackgroundColor(light ? 0xFFFFFFFF : 0x261C2833);
+            card.setStrokeColor(light ? 0x33424B57 : 0x1FFFFFFF);
+        }
+        holder.poster.setBackgroundColor(light ? 0xFFE7EDF3 : 0xFF25313D);
+        holder.title.setTextColor(light ? 0xFF12202D : 0xFFFFFFFF);
+        holder.year.setTextColor(light ? 0x9912202D : 0x99FFFFFF);
+        holder.character.setTextColor(light ? 0xFF1D6E4A : 0xFFCFE8FF);
+        holder.overview.setTextColor(light ? 0xCC12202D : 0xCCFFFFFF);
+        holder.rating.setTextColor(0xFFFFFFFF);
     }
 
     @Override

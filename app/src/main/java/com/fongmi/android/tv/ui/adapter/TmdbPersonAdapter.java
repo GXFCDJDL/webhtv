@@ -24,6 +24,7 @@ public class TmdbPersonAdapter extends RecyclerView.Adapter<TmdbPersonAdapter.Vi
     private final Listener listener;
     private final List<TmdbPerson> items = new ArrayList<>();
     private boolean cinema;
+    private boolean light;
 
     public TmdbPersonAdapter(Listener listener) {
         this.listener = listener;
@@ -40,6 +41,11 @@ public class TmdbPersonAdapter extends RecyclerView.Adapter<TmdbPersonAdapter.Vi
         notifyDataSetChanged();
     }
 
+    public void setLight(boolean light) {
+        this.light = light;
+        notifyDataSetChanged();
+    }
+
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -51,10 +57,11 @@ public class TmdbPersonAdapter extends RecyclerView.Adapter<TmdbPersonAdapter.Vi
         TmdbPerson item = items.get(position);
         holder.binding.name.setText(item.getName());
         holder.binding.subtitle.setText(item.getSubtitle());
-        holder.binding.name.setTextColor(0xFFFFFFFF);
-        holder.binding.subtitle.setTextColor(cinema ? 0xB3FFFFFF : 0x99FFFFFF);
+        boolean darkChrome = cinema || !light;
+        holder.binding.name.setTextColor(darkChrome ? 0xFFFFFFFF : 0xFF12202D);
+        holder.binding.subtitle.setTextColor(darkChrome ? (cinema ? 0xB3FFFFFF : 0x99FFFFFF) : 0x9912202D);
         applyCardStyle(holder);
-        TmdbCardFocusHelper.bind(holder.binding.getRoot(), cinema ? 0x00000000 : 0xFF16202A, cinema ? 0x00FFFFFF : 0x33FFFFFF, cinema ? 0 : 1);
+        TmdbCardFocusHelper.bind(holder.binding.getRoot(), cinema ? 0x00000000 : (light ? 0xFFFFFFFF : 0xFF16202A), cinema ? 0x00FFFFFF : (light ? 0x33424B57 : 0x33FFFFFF), cinema ? 0 : 1);
         ImgUtil.load(item.getName(), item.getProfileUrl(), holder.binding.photo);
         holder.binding.getRoot().setOnClickListener(view -> listener.onItemClick(item));
     }

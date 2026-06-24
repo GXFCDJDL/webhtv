@@ -3,6 +3,7 @@ package com.fongmi.android.tv.ui.dialog;
 import android.app.Activity;
 import android.app.Dialog;
 import android.content.res.ColorStateList;
+import android.content.res.Configuration;
 import android.os.Build;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
@@ -38,6 +39,7 @@ import com.fongmi.android.tv.utils.TmdbImageSaver;
 import com.fongmi.android.tv.utils.Util;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.card.MaterialCardView;
 import com.google.gson.JsonObject;
 
 import java.util.ArrayList;
@@ -68,6 +70,7 @@ public class TmdbPersonDialog {
 
     private TmdbPersonPhotoAdapter photoAdapter;
     private TmdbPersonWorkAdapter workAdapter;
+    private boolean light;
 
     private TmdbPersonWorkFilters workFilters = TmdbPersonWorkFilters.from(null, null);
     private String currentDepartmentFilter = TmdbPersonWorkFilters.ALL;
@@ -99,6 +102,7 @@ public class TmdbPersonDialog {
         this.site = site;
         this.tmdbService = new TmdbService();
         this.tmdbConfig = TmdbConfig.objectFrom(Setting.getTmdbConfig());
+        this.light = resolveLightTheme(activity);
     }
 
     private void show() {
@@ -144,6 +148,7 @@ public class TmdbPersonDialog {
         View closeBtn = view.findViewById(R.id.closeBtn);
 
         applyPanelSize(view);
+        applyTheme(view);
         name.setText(person.getName());
         role.setText(person.getSubtitle());
 
@@ -165,6 +170,7 @@ public class TmdbPersonDialog {
 
         // 设置作品列表（旧版纵向信息卡，懒加载）
         workAdapter = new TmdbPersonWorkAdapter(this::onWorkClick);
+        workAdapter.setLight(light);
         LinearLayoutManager workLayoutManager = new LinearLayoutManager(activity);
         worksRecycler.setLayoutManager(workLayoutManager);
         worksRecycler.setAdapter(workAdapter);
@@ -301,7 +307,7 @@ public class TmdbPersonDialog {
             chip.setCheckable(true);
             chip.setChecked(option.key().equals(current));
             chip.setOnClickListener(v -> callback.onFilter(option.key()));
-            applyDarkChipStyle(chip);
+            applyChipStyle(chip);
             if (Util.isLeanback()) {
                 chip.setFocusable(true);
                 chip.setChipStrokeWidth(2f);
@@ -310,7 +316,7 @@ public class TmdbPersonDialog {
         }
     }
 
-    private void applyDarkChipStyle(Chip chip) {
+    private void applyChipStyle(Chip chip) {
         int[][] states = new int[][]{
                 new int[]{android.R.attr.state_checked, android.R.attr.state_focused},
                 new int[]{android.R.attr.state_checked},
@@ -318,11 +324,63 @@ public class TmdbPersonDialog {
                 new int[]{}
         };
         chip.setCheckedIconVisible(false);
-        chip.setChipBackgroundColor(new ColorStateList(states, new int[]{0xFFFFFFFF, 0xFFEAF2F8, 0x33FFFFFF, 0x1AFFFFFF}));
-        chip.setTextColor(new ColorStateList(states, new int[]{0xFF101820, 0xFF101820, 0xFFFFFFFF, 0xE6FFFFFF}));
-        chip.setChipStrokeColor(new ColorStateList(states, new int[]{0xFFFFFFFF, 0xFFEAF2F8, 0x99FFFFFF, 0x4DFFFFFF}));
-        chip.setRippleColor(ColorStateList.valueOf(0x33FFFFFF));
+        if (light) {
+            chip.setChipBackgroundColor(new ColorStateList(states, new int[]{0xFF12202D, 0xFF12202D, 0xFFE7EDF3, 0xFFFFFFFF}));
+            chip.setTextColor(new ColorStateList(states, new int[]{0xFFFFFFFF, 0xFFFFFFFF, 0xFF12202D, 0xCC12202D}));
+            chip.setChipStrokeColor(new ColorStateList(states, new int[]{0xFF12202D, 0xFF12202D, 0x66424B57, 0x33424B57}));
+            chip.setRippleColor(ColorStateList.valueOf(0x1F12202D));
+        } else {
+            chip.setChipBackgroundColor(new ColorStateList(states, new int[]{0xFFFFFFFF, 0xFFEAF2F8, 0x33FFFFFF, 0x1AFFFFFF}));
+            chip.setTextColor(new ColorStateList(states, new int[]{0xFF101820, 0xFF101820, 0xFFFFFFFF, 0xE6FFFFFF}));
+            chip.setChipStrokeColor(new ColorStateList(states, new int[]{0xFFFFFFFF, 0xFFEAF2F8, 0x99FFFFFF, 0x4DFFFFFF}));
+            chip.setRippleColor(ColorStateList.valueOf(0x33FFFFFF));
+        }
         chip.setChipStrokeWidth(1f);
+    }
+
+    private void applyTheme(View view) {
+        MaterialCardView panel = view.findViewById(R.id.panel);
+        MaterialCardView profileCard = view.findViewById(R.id.profileCard);
+        MaterialCardView biographyCard = view.findViewById(R.id.biographyCard);
+        ImageView profile = view.findViewById(R.id.profile);
+        ImageView close = view.findViewById(R.id.closeBtn);
+        int overlay = light ? 0x99F4F7FA : 0x8F000000;
+        int panelColor = light ? 0xFFF4F7FA : 0xF2101821;
+        int cardColor = light ? 0xFFFFFFFF : 0x261C2833;
+        int imageBg = light ? 0xFFE7EDF3 : 0xFF25313D;
+        int stroke = light ? 0x33424B57 : 0x33FFFFFF;
+        int subtleStroke = light ? 0x26424B57 : 0x1FFFFFFF;
+        int primary = light ? 0xFF12202D : 0xFFFFFFFF;
+        int secondary = light ? 0xB312202D : 0xB3FFFFFF;
+        int muted = light ? 0x9912202D : 0x99FFFFFF;
+        int body = light ? 0xDD12202D : 0xDDEAF2F8;
+
+        view.setBackgroundColor(overlay);
+        panel.setCardBackgroundColor(panelColor);
+        panel.setStrokeColor(stroke);
+        profileCard.setCardBackgroundColor(imageBg);
+        profileCard.setStrokeColor(subtleStroke);
+        biographyCard.setCardBackgroundColor(cardColor);
+        biographyCard.setStrokeColor(subtleStroke);
+        profile.setBackgroundColor(imageBg);
+        close.setColorFilter(primary);
+        tint(view.findViewById(R.id.castTitle), secondary);
+        tint(view.findViewById(R.id.name), primary);
+        tint(view.findViewById(R.id.role), secondary);
+        tint(view.findViewById(R.id.stats), muted);
+        tint(view.findViewById(R.id.biographyTitle), primary);
+        tint(view.findViewById(R.id.biography), body);
+        tint(view.findViewById(R.id.workTitle), primary);
+        tint(view.findViewById(R.id.photosTitle), primary);
+    }
+
+    private void tint(TextView view, int color) {
+        if (view != null) view.setTextColor(color);
+    }
+
+    private static boolean resolveLightTheme(Activity activity) {
+        int night = activity.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        return Setting.resolveTmdbDetailLightTheme(Setting.getTmdbDetailTheme(), night == Configuration.UI_MODE_NIGHT_YES);
     }
 
     /**
