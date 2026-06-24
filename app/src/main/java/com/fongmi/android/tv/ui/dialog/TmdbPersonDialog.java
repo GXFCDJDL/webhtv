@@ -304,13 +304,6 @@ public class TmdbPersonDialog {
             applyDarkChipStyle(chip);
             if (Util.isLeanback()) {
                 chip.setFocusable(true);
-                chip.setOnFocusChangeListener((v, hasFocus) -> {
-                    chip.setChipBackgroundColorResource(hasFocus ? android.R.color.white : android.R.color.transparent);
-                    chip.setTextColor(hasFocus ? 0xFF1C2530 : 0xFFFFFFFF);
-                });
-                chip.setChipBackgroundColorResource(android.R.color.transparent);
-                chip.setTextColor(0xFFFFFFFF);
-                chip.setChipStrokeColorResource(R.color.white);
                 chip.setChipStrokeWidth(2f);
             }
             group.addView(chip);
@@ -319,13 +312,16 @@ public class TmdbPersonDialog {
 
     private void applyDarkChipStyle(Chip chip) {
         int[][] states = new int[][]{
+                new int[]{android.R.attr.state_checked, android.R.attr.state_focused},
                 new int[]{android.R.attr.state_checked},
                 new int[]{android.R.attr.state_focused},
                 new int[]{}
         };
-        chip.setChipBackgroundColor(new ColorStateList(states, new int[]{0xFFEAF2F8, 0x33FFFFFF, 0x00000000}));
-        chip.setTextColor(new ColorStateList(states, new int[]{0xFF101820, 0xFFFFFFFF, 0xFFFFFFFF}));
-        chip.setChipStrokeColor(new ColorStateList(states, new int[]{0xFFEAF2F8, 0x66FFFFFF, 0x33FFFFFF}));
+        chip.setCheckedIconVisible(false);
+        chip.setChipBackgroundColor(new ColorStateList(states, new int[]{0xFFFFFFFF, 0xFFEAF2F8, 0x33FFFFFF, 0x1AFFFFFF}));
+        chip.setTextColor(new ColorStateList(states, new int[]{0xFF101820, 0xFF101820, 0xFFFFFFFF, 0xE6FFFFFF}));
+        chip.setChipStrokeColor(new ColorStateList(states, new int[]{0xFFFFFFFF, 0xFFEAF2F8, 0x99FFFFFF, 0x4DFFFFFF}));
+        chip.setRippleColor(ColorStateList.valueOf(0x33FFFFFF));
         chip.setChipStrokeWidth(1f);
     }
 
