@@ -116,6 +116,7 @@ public class TmdbHeaderView {
     private ImageView backdropView;
     private java.util.List<String> backdropPhotos = new java.util.ArrayList<>();
     private int currentBackdropIndex = 0;
+    private int detailThemeModeOverride;
     private android.os.Handler backdropHandler;
     private Runnable backdropRunnable;
 
@@ -133,6 +134,12 @@ public class TmdbHeaderView {
 
     public void setActionListener(ActionListener listener) {
         this.actionListener = listener;
+    }
+
+    public void setDetailThemeMode(int detailThemeMode) {
+        int normalized = detailThemeMode == 1 ? 1 : 2;
+        detailThemeModeOverride = normalized;
+        applyTheme();
     }
 
     /**
@@ -1249,7 +1256,7 @@ public class TmdbHeaderView {
             return;
         }
         boolean cinema = style == Setting.DETAIL_STYLE_CINEMA;
-        boolean light = cinema ? TmdbCinemaTheme.resolveLight(Setting.getTmdbDetailTheme(), isSystemNight()) : style == Setting.DETAIL_STYLE_PROFILE;
+        boolean light = cinema ? resolveLightTheme() : style == Setting.DETAIL_STYLE_PROFILE;
         boolean dark = style == Setting.DETAIL_STYLE_NATIVE || (cinema && !light);
         setCinemaRows(cinema, cinema, light);
         int background = cinema ? TmdbCinemaTheme.palette(light).background() : dark ? COLOR_NATIVE_BACKGROUND : COLOR_PROFILE_BACKGROUND;
@@ -1285,7 +1292,7 @@ public class TmdbHeaderView {
         moveActionsForFusion();
 
         boolean cinema = style == Setting.DETAIL_STYLE_CINEMA;
-        boolean light = cinema ? TmdbCinemaTheme.resolveLight(Setting.getTmdbDetailTheme(), isSystemNight()) : !isDarkDetailTheme();
+        boolean light = cinema ? resolveLightTheme() : !isDarkDetailTheme();
         boolean dark = !light;
         int panel = dark ? 0xC914171C : 0xAFFFFFFF;
         int line = dark ? 0x42FFFFFF : 0x33424B57;
@@ -1327,11 +1334,19 @@ public class TmdbHeaderView {
     }
 
     private boolean isDarkDetailTheme() {
-        return !Setting.resolveTmdbDetailLightTheme(Setting.getTmdbDetailTheme(), isSystemNight());
+        return !resolveLightTheme();
     }
 
     private boolean isSystemNight() {
         return (activity.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+    }
+
+    private boolean resolveLightTheme() {
+        return Setting.resolveTmdbDetailLightTheme(currentDetailThemeMode(), isSystemNight());
+    }
+
+    private int currentDetailThemeMode() {
+        return detailThemeModeOverride == 1 || detailThemeModeOverride == 2 ? detailThemeModeOverride : Setting.getTmdbDetailTheme();
     }
 
     private void setCinemaRows(boolean peopleCinema, boolean recommendationCinema, boolean light) {
@@ -1628,7 +1643,7 @@ public class TmdbHeaderView {
 
     private boolean isLightDetailChrome() {
         int style = Setting.getTmdbDetailStyle();
-        if (style == Setting.DETAIL_STYLE_CINEMA) return TmdbCinemaTheme.resolveLight(Setting.getTmdbDetailTheme(), isSystemNight());
+        if (style == Setting.DETAIL_STYLE_CINEMA) return resolveLightTheme();
         return style == Setting.DETAIL_STYLE_PROFILE && !Setting.isFusionDetailPage();
     }
 

@@ -6,6 +6,7 @@ import android.content.pm.ActivityInfo;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.content.Intent;
+import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
@@ -32,7 +33,9 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.Player;
@@ -391,6 +394,7 @@ public class TmdbDetailActivity extends PlaybackActivity implements TrackDialog.
         tmdbConfig = TmdbConfig.objectFrom(Setting.getTmdbConfig());
         initialTmdbItem = getIntentTmdbItem();
         detailThemeMode = Setting.getTmdbDetailTheme();
+        applyDetailEdgeToEdge();
         applySystemBarInsets();
         initPage();
         loadContent(null);
@@ -574,6 +578,22 @@ public class TmdbDetailActivity extends PlaybackActivity implements TrackDialog.
             return insets;
         });
         ViewCompat.requestApplyInsets(binding.root);
+    }
+
+    private void applyDetailEdgeToEdge() {
+        Window window = getWindow();
+        if (window == null) return;
+        WindowCompat.setDecorFitsSystemWindows(window, false);
+        window.setStatusBarColor(Color.TRANSPARENT);
+        window.setNavigationBarColor(Color.TRANSPARENT);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.setStatusBarContrastEnforced(false);
+            window.setNavigationBarContrastEnforced(false);
+        }
+        WindowInsetsControllerCompat insets = WindowCompat.getInsetsController(window, window.getDecorView());
+        boolean lightBars = lightTheme && !isFusionMode();
+        insets.setAppearanceLightStatusBars(lightBars);
+        insets.setAppearanceLightNavigationBars(lightBars);
     }
 
     private void initFusionPlayer() {
@@ -959,6 +979,7 @@ public class TmdbDetailActivity extends PlaybackActivity implements TrackDialog.
 
     private void applyDetailTheme() {
         lightTheme = resolveLightTheme();
+        applyDetailEdgeToEdge();
         ThemeColors colors = lightTheme ? ThemeColors.light() : ThemeColors.dark();
         if (isCinemaMode()) colors = ThemeColors.cinema(lightTheme);
         int backdropBackground = backdropFallbackBackground(colors);
@@ -2097,7 +2118,7 @@ public class TmdbDetailActivity extends PlaybackActivity implements TrackDialog.
     }
 
     private boolean shouldCropBackdrop() {
-        return !isFusionMode() || preferLandscapeBackground();
+        return true;
     }
 
     private int backdropFallbackBackground(ThemeColors colors) {

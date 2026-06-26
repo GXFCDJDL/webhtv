@@ -161,6 +161,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
     private static final String EXTRA_TMDB_PLAY_FLAG = "tmdb_play_flag";
     private static final String EXTRA_TMDB_PLAY_EPISODE_NAME = "tmdb_play_episode_name";
     private static final String EXTRA_TMDB_PLAY_EPISODE_URL = "tmdb_play_episode_url";
+    private static final String EXTRA_TMDB_DETAIL_THEME = "tmdb_detail_theme";
     private static final int TMDB_TABLET_PLAYER_MIN_WIDTH_DP = 440;
     private static final int TMDB_TABLET_PLAYER_MAX_WIDTH_DP = 640;
     private static final int TMDB_TABLET_PLAYER_SIDE_MARGIN_DP = 24;
@@ -416,6 +417,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
         if (AudioActivity.startSite(activity, key, id, name, pic, mark)) return;
         Intent intent = new Intent(activity, VideoActivity.class);
         intent.putExtra("tmdbMode", item != null);
+        intent.putExtra(EXTRA_TMDB_DETAIL_THEME, Setting.getTmdbDetailTheme());
         intent.putExtra("tmdbItem", item);
         intent.putExtra("collect", false);
         intent.putExtra("mark", mark);
@@ -2932,6 +2934,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
         // 注入 TMDB 风格头部面板
         ViewGroup scrollContainer = (ViewGroup) mBinding.scroll.getChildAt(0);
         mTmdbHeaderView = new com.fongmi.android.tv.ui.custom.TmdbHeaderView(this, scrollContainer);
+        mTmdbHeaderView.setDetailThemeMode(getFusionDetailThemeMode());
         mTmdbHeaderView.inflate();
         mTmdbHeaderView.setActionListener(new com.fongmi.android.tv.ui.custom.TmdbHeaderView.ActionListener() {
             @Override
@@ -2988,9 +2991,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
         mFusionChromeApplied = true;
         applyFusionThemeSurface();
 
-        RelativeLayout.LayoutParams wallParams = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT);
-        mBinding.contextWall.setLayoutParams(wallParams);
-        if (mBinding.videoContextScrim != null) mBinding.videoContextScrim.setVisibility(View.GONE);
+        applyFusionBackdropLayout();
 
         RelativeLayout.LayoutParams videoParams = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, ResUtil.dp2px(FUSION_PLAYER_HEIGHT_DP));
         videoParams.addRule(RelativeLayout.BELOW, R.id.statusBar);
@@ -3006,6 +3007,17 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
 
         ensureFusionThemeButton();
         updateFusionThemeButton();
+    }
+
+    private void applyFusionBackdropLayout() {
+        RelativeLayout.LayoutParams wallParams = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.MATCH_PARENT);
+        wallParams.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+        wallParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+        wallParams.addRule(RelativeLayout.ALIGN_PARENT_START);
+        wallParams.addRule(RelativeLayout.ALIGN_PARENT_END);
+        mBinding.contextWall.setLayoutParams(wallParams);
+        mBinding.statusBar.setBackgroundColor(Color.TRANSPARENT);
+        if (mBinding.videoContextScrim != null) mBinding.videoContextScrim.setVisibility(View.GONE);
     }
 
     private void setFusionPlayerBottomGap() {
@@ -3058,7 +3070,9 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
     }
 
     private void cycleFusionTheme() {
-        Setting.putTmdbDetailTheme(isFusionLightTheme() ? 1 : 2);
+        int theme = isFusionLightTheme() ? 2 : 1;
+        Setting.putTmdbDetailTheme(theme);
+        getIntent().putExtra(EXTRA_TMDB_DETAIL_THEME, theme);
         applyFusionThemeSurface();
         updateFusionThemeButton();
         if (mTmdbHeaderView != null && mTmdbUIAdapter != null && mTmdbUIAdapter.isLoaded()) {
@@ -3081,6 +3095,9 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
         mBinding.scroll.setBackgroundColor(Color.TRANSPARENT);
         mBinding.swipeLayout.setBackgroundColor(Color.TRANSPARENT);
         mBinding.progressLayout.setBackgroundColor(Color.TRANSPARENT);
+        if (mBinding.nativeContentContainer != null) mBinding.nativeContentContainer.setBackgroundColor(Color.TRANSPARENT);
+        syncFusionHeaderTheme();
+        if (mFlagAdapter != null) mFlagAdapter.setTmdbLight(light);
         applyFusionNativeTextColors();
     }
 
@@ -3122,7 +3139,15 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
     }
 
     private boolean isFusionLightTheme() {
-        return Setting.resolveTmdbDetailLightTheme(Setting.getTmdbDetailTheme(), isSystemNight());
+        return Setting.resolveTmdbDetailLightTheme(getFusionDetailThemeMode(), isSystemNight());
+    }
+
+    private int getFusionDetailThemeMode() {
+        return getIntent().getIntExtra(EXTRA_TMDB_DETAIL_THEME, Setting.getTmdbDetailTheme()) == 1 ? 1 : 2;
+    }
+
+    private void syncFusionHeaderTheme() {
+        if (mTmdbHeaderView != null) mTmdbHeaderView.setDetailThemeMode(getFusionDetailThemeMode());
     }
 
     private boolean isSystemNight() {
@@ -3404,6 +3429,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
         }
         mTmdbControlsMoved = true;
         updateEpisodeGroupVisibility();
+        applyFusionThemeSurface();
     }
 
     private void restoreFlagAndEpisodeFromTmdb() {
@@ -3431,6 +3457,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
     }
 
     private void setTmdbFlagStyle(boolean enabled) {
+        mFlagAdapter.setTmdbLight(!Setting.isFusionDetailPage() || isFusionLightTheme());
         mFlagAdapter.setTmdbStyle(enabled);
         mBinding.flag.setAdapter(null);
         mBinding.flag.setAdapter(mFlagAdapter);
