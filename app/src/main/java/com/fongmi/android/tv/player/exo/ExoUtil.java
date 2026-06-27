@@ -104,7 +104,8 @@ public class ExoUtil {
         return extras.keySet().stream().filter(key -> extras.getString(key) != null).collect(Collectors.toMap(key -> key, extras::getString));
     }
 
-    static int getRenderMode(int decode) {
+    private static int getRenderMode(int decode) {
+        if (decode == PlayerEngine.HARD && PlayerSetting.isExo4KCompat()) return DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF;
         return decode == PlayerEngine.HARD ? DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON : DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER;
     }
 
@@ -147,6 +148,7 @@ public class ExoUtil {
                 return ExoUtil.buildAudioSink(context, enableFloatOutput, enableAudioOutputPlaybackParams);
             }
         };
+        if (PlayerSetting.isExo4KCompat()) factory.forceEnableMediaCodecAsynchronousQueueing();
         return factory.setEnableDecoderFallback(true).setExtensionRendererMode(renderMode);
     }
 

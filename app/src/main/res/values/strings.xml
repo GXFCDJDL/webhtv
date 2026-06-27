@@ -7,6 +7,7 @@
     <string name="live_pass">Pass</string>
     <string name="live_refresh">Refresh</string>
     <string name="live_line">Line <xliff:g name="name">%s</xliff:g></string>
+    <string name="live_control_source">Live source</string>
     <string name="live_no_epg">00:00 - 23:59 暂无节目信息</string>
 
     <!-- Detail -->
@@ -793,6 +794,7 @@
     <string name="player">Player</string>
     <string name="player_default">Default player</string>
     <string name="player_render">Render</string>
+    <string name="player_exo_4k_compat">Exo 4K compatibility</string>
     <string name="player_kernel">Player engine</string>
     <string name="player_scale">Scale</string>
     <string name="player_lut">LUT color</string>
