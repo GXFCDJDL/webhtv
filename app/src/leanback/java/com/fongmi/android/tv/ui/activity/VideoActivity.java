@@ -1069,6 +1069,7 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
         item.checkName(getName());
         boolean loadTmdbDetail = shouldLoadTmdbDetail();
         item.checkContent(getContent());
+        setOriginalEnhancedActionVisibility(loadTmdbDetail && Setting.isOriginalEnhancedDetailPage());
         if (isIntentTmdbPlayback()) com.fongmi.android.tv.utils.TmdbEpisodeSorter.sort(item);
         applyTmdbEpisodeTitles(item);
         setTmdbRematchVisible(loadTmdbDetail);
@@ -1100,6 +1101,11 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
 
     private boolean shouldLoadTmdbDetail() {
         return mTmdbUIAdapter != null && mTmdbUIAdapter.isReady();
+    }
+
+    private void setOriginalEnhancedActionVisibility(boolean hide) {
+        mBinding.shortDisplay.setVisibility(hide ? View.GONE : View.VISIBLE);
+        mBinding.change1.setVisibility(hide ? View.GONE : View.VISIBLE);
     }
 
     private void setTmdbRematchVisible(boolean visible) {

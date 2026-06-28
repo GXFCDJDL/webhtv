@@ -1127,6 +1127,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
         mTmdbFallbackToNative = false;
         mTmdbContentLoaded = false;
         mTmdbAutoDialogShown = false;
+        setOriginalEnhancedActionVisibility(tmdbMode && Setting.isOriginalEnhancedDetailPage());
         if (tmdbMode) {
             hideTmdbHeader();
             setNativeDetailInfoVisible(false);
@@ -1278,7 +1279,6 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
         mBinding.director.setVisibility(View.GONE);
         mBinding.actor.setVisibility(View.GONE);
         mBinding.contentLayout.setVisibility(View.GONE);
-        mBinding.actionRow.setVisibility(View.GONE);
     }
 
     private void setPlainText(TextView view, String text) {
@@ -1296,7 +1296,10 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
         mBinding.director.setVisibility(visibility);
         mBinding.actor.setVisibility(visibility);
         mBinding.contentLayout.setVisibility(visibility);
-        mBinding.actionRow.setVisibility(visibility);
+    }
+
+    private void setOriginalEnhancedActionVisibility(boolean hide) {
+        mBinding.shortDisplay.setVisibility(hide ? View.GONE : View.VISIBLE);
     }
 
     private void setText(TextView view, int resId, String text) {
@@ -3422,6 +3425,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
         updateEpisodeGroupVisibility();
         restoreDefaultVideoLayout();
         setNativeDetailInfoVisible(true);
+        setOriginalEnhancedActionVisibility(false);
         mBinding.search.setVisibility(View.VISIBLE);
         if (mBinding.videoShadow != null) mBinding.videoShadow.setVisibility(View.VISIBLE);
         setText(item);

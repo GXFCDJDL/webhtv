@@ -124,6 +124,69 @@ public class VideoActivityLayoutTest {
     }
 
     @Test
+    public void mobileOriginalEnhancedHidesShortDisplayButKeepsDetailActionRow() throws Exception {
+        Path sourcePath = findMobileJavaPath().resolve(Path.of("com", "fongmi", "android", "tv", "ui", "activity", "VideoActivity.java"));
+        String source = new String(Files.readAllBytes(sourcePath), StandardCharsets.UTF_8);
+        int method = source.indexOf("private void setNativeDetailInfoVisible(boolean visible)");
+        int nextMethod = source.indexOf("private void setText(TextView view", method);
+        String methodBody = nextMethod > method ? source.substring(method, nextMethod) : source.substring(method);
+        int visibilityMethod = source.indexOf("private void setOriginalEnhancedActionVisibility(boolean hide)");
+
+        assertTrue(sourcePath + " is missing setNativeDetailInfoVisible", method >= 0);
+        assertTrue("native enhanced mode must not hide the whole detail action row",
+                !methodBody.contains("mBinding.actionRow.setVisibility(visibility)"));
+        assertTrue(sourcePath + " is missing setOriginalEnhancedActionVisibility", visibilityMethod >= 0);
+        assertTrue("native enhanced mode must hide the short display button",
+                source.indexOf("mBinding.shortDisplay.setVisibility(hide ? View.GONE : View.VISIBLE)", visibilityMethod) > visibilityMethod);
+    }
+
+    @Test
+    public void leanbackOriginalEnhancedHidesShortDisplayAndSourceActions() throws Exception {
+        Path sourcePath = findLeanbackJavaPath().resolve(Path.of("com", "fongmi", "android", "tv", "ui", "activity", "VideoActivity.java"));
+        String source = new String(Files.readAllBytes(sourcePath), StandardCharsets.UTF_8);
+        int method = source.indexOf("private void setOriginalEnhancedActionVisibility(boolean hide)");
+
+        assertTrue(sourcePath + " is missing setOriginalEnhancedActionVisibility", method >= 0);
+        assertTrue("native enhanced mode must hide the short display button",
+                source.indexOf("mBinding.shortDisplay.setVisibility(hide ? View.GONE : View.VISIBLE)", method) > method);
+        assertTrue("native enhanced mode must hide the source change button",
+                source.indexOf("mBinding.change1.setVisibility(hide ? View.GONE : View.VISIBLE)", method) > method);
+    }
+
+    @Test
+    public void tmdbHeaderHidesChangeSourceInOriginalEnhancedMode() throws Exception {
+        Path sourcePath = findMainJavaPath().resolve(Path.of("com", "fongmi", "android", "tv", "ui", "custom", "TmdbHeaderView.java"));
+        String source = new String(Files.readAllBytes(sourcePath), StandardCharsets.UTF_8);
+        int method = source.indexOf("private void updateOriginalEnhancedActionVisibility()");
+
+        assertTrue(sourcePath + " is missing updateOriginalEnhancedActionVisibility", method >= 0);
+        assertTrue("TMDB header must hide source change in original enhanced mode",
+                source.indexOf("changeSource.setVisibility(Setting.isOriginalEnhancedDetailPage() ? View.GONE : View.VISIBLE)", method) > method);
+    }
+
+    @Test
+    public void leanbackNativeActionButtonsShareMinimumWidth() throws Exception {
+        Path layoutPath = findLeanbackResPath().resolve(Path.of("layout", "activity_video.xml"));
+        for (String id : Arrays.asList("content", "shortDisplay", "search", "keep", "change1", "tmdbRematch")) {
+            Element action = findAndroidId(layoutPath.toFile(), id);
+            assertTrue(layoutPath + " is missing @+id/" + id, action != null);
+            assertTrue(id + " must use the shared native action width",
+                    "96dp".equals(action.getAttribute("android:minWidth")));
+        }
+    }
+
+    @Test
+    public void tmdbHeaderActionButtonsShareMinimumWidth() throws Exception {
+        Path layoutPath = findMainResPath().resolve(Path.of("layout", "view_tmdb_header.xml"));
+        for (String id : Arrays.asList("tmdbChangeSource", "tmdbKeep", "tmdbRematch")) {
+            Element action = findAndroidId(layoutPath.toFile(), id);
+            assertTrue(layoutPath + " is missing @+id/" + id, action != null);
+            assertTrue(id + " must use the shared TMDB header action width",
+                    "72dp".equals(action.getAttribute("android:minWidth")));
+        }
+    }
+
+    @Test
     public void mobileVideoDirectTmdbCarriesDetailThemeIntoPlayback() throws Exception {
         Path sourcePath = findMobileJavaPath().resolve(Path.of("com", "fongmi", "android", "tv", "ui", "activity", "VideoActivity.java"));
         String source = new String(Files.readAllBytes(sourcePath), StandardCharsets.UTF_8);
@@ -318,6 +381,12 @@ public class VideoActivityLayoutTest {
         Path moduleRelative = Path.of("src", "main", "java");
         if (Files.exists(moduleRelative)) return moduleRelative;
         return Path.of("app", "src", "main", "java");
+    }
+
+    private static Path findMainResPath() {
+        Path moduleRelative = Path.of("src", "main", "res");
+        if (Files.exists(moduleRelative)) return moduleRelative;
+        return Path.of("app", "src", "main", "res");
     }
 
     private static Path findLeanbackJavaPath() {

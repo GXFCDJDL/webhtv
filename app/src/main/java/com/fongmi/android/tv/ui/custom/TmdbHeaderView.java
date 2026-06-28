@@ -184,6 +184,7 @@ public class TmdbHeaderView {
         headerRoot.setVisibility(View.GONE);
         setupRecyclerViews();
         setupActions();
+        updateOriginalEnhancedActionVisibility();
         applyTheme();
     }
 
@@ -505,6 +506,13 @@ public class TmdbHeaderView {
         headerRoot.findViewById(R.id.tmdbKeep).setOnClickListener(view -> {
             if (actionListener != null) actionListener.onKeep();
         });
+    }
+
+    private void updateOriginalEnhancedActionVisibility() {
+        if (headerRoot == null) return;
+        View changeSource = headerRoot.findViewById(R.id.tmdbChangeSource);
+        if (changeSource == null) return;
+        changeSource.setVisibility(Setting.isOriginalEnhancedDetailPage() ? View.GONE : View.VISIBLE);
     }
 
     /**
