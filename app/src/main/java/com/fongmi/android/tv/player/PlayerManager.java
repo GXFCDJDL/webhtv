@@ -380,8 +380,11 @@ public class PlayerManager implements ParseCallback {
     }
 
     public void setSub(Sub sub) {
-        if (spec != null) spec.setSub(sub);
-        setMediaItem();
+        if (sub == null || spec == null) return;
+        Track.delete(getKey(), C.TRACK_TYPE_TEXT);
+        engine.resetTrack(C.TRACK_TYPE_TEXT);
+        spec.setSub(sub);
+        restartCurrentItemWithState();
     }
 
     public void setFormat(String format) {
@@ -666,6 +669,25 @@ public class PlayerManager implements ParseCallback {
             return;
         }
         setMediaItemNow(timeout, true);
+    }
+
+    private void restartCurrentItemWithState() {
+        if (spec == null || spec.getUrl() == null || engine == null || player == null) return;
+        if (player.getCurrentMediaItem() == null || player.getPlaybackState() == Player.STATE_IDLE) {
+            setMediaItem();
+            return;
+        }
+        if (!ensurePlayerAvailableForPlayback()) return;
+        long position = Math.max(0, player.getCurrentPosition());
+        boolean playWhenReady = player.getPlayWhenReady();
+        if (SpiderDebug.isEnabled()) SpiderDebug.log("player", "restart media item for subtitle position=%d play=%s spec=%s", position, playWhenReady, debugSpec());
+        App.removeCallbacks(runnable);
+        currentDanmakuUrl = null;
+        setDanmakus(spec.getDanmakus());
+        initTrack = false;
+        waitingLutBeforePlay = false;
+        engine.restart(spec.checkUa(), position, playWhenReady);
+        App.post(runnable, Constant.TIMEOUT_PLAY);
     }
 
     private void awaitLocalProxyAndSetMediaItem(int seq, long timeout) {

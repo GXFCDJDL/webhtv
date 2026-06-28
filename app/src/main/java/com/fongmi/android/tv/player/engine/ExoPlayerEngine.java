@@ -153,6 +153,11 @@ public class ExoPlayerEngine implements PlayerEngine {
     }
 
     @Override
+    public void resetTrack(int type) {
+        TrackUtil.reset(player, type);
+    }
+
+    @Override
     public boolean haveTrack(int type) {
         return TrackUtil.count(getCurrentTracks(), type) > 0;
     }

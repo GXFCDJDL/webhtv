@@ -72,6 +72,7 @@ import com.fongmi.android.tv.databinding.DialogTmdbEpisodeBinding;
 import com.fongmi.android.tv.db.AppDatabase;
 import com.fongmi.android.tv.event.RefreshEvent;
 import com.fongmi.android.tv.player.IntroSkipPlayback;
+import com.fongmi.android.tv.player.PlayerManager;
 import com.fongmi.android.tv.player.PlayerHelper;
 import com.fongmi.android.tv.service.AiRecommendationService;
 import com.fongmi.android.tv.service.PersonalRecommendationService;
@@ -81,6 +82,7 @@ import com.fongmi.android.tv.service.TmdbService;
 import com.fongmi.android.tv.setting.DanmakuSetting;
 import com.fongmi.android.tv.setting.PlayerSetting;
 import com.fongmi.android.tv.setting.Setting;
+import com.fongmi.android.tv.subtitle.SubtitlePlaybackSession;
 import com.fongmi.android.tv.ui.adapter.EpisodeAdapter;
 import com.fongmi.android.tv.ui.adapter.InlineEpisodeAdapter;
 import com.fongmi.android.tv.ui.adapter.TmdbEpisodeAdapter;
@@ -94,6 +96,7 @@ import com.fongmi.android.tv.ui.custom.PlayerGesture;
 import com.fongmi.android.tv.ui.dialog.DanmakuDialog;
 import com.fongmi.android.tv.ui.dialog.DisplayDialog;
 import com.fongmi.android.tv.ui.dialog.SubtitleDialog;
+import com.fongmi.android.tv.ui.dialog.SubtitleManualSearchDialog;
 import com.fongmi.android.tv.ui.dialog.TitleDialog;
 import com.fongmi.android.tv.ui.dialog.TmdbSearchDialog;
 import com.fongmi.android.tv.ui.dialog.TrackDialog;
@@ -157,7 +160,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class TmdbDetailActivity extends PlaybackActivity implements TrackDialog.Listener, Clock.Callback, PlayerGesture.Listener {
+public class TmdbDetailActivity extends PlaybackActivity implements TrackDialog.Listener, Clock.Callback, PlayerGesture.Listener, SubtitlePlaybackSession.Host {
 
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.getDefault());
     private static final int FOCUS_STROKE = 0xFFFFD166;
@@ -177,6 +180,7 @@ public class TmdbDetailActivity extends PlaybackActivity implements TrackDialog.
 
     private final TmdbService tmdbService = new TmdbService();
     private final IntroSkipPlayback introSkipPlayback = new IntroSkipPlayback();
+    private final SubtitlePlaybackSession subtitlePlaybackSession = new SubtitlePlaybackSession(this);
     private final List<TmdbPerson> detailCastItems = new ArrayList<>();
     private final List<TmdbPerson> castItems = new ArrayList<>();
     private final List<TmdbPerson> creatorItems = new ArrayList<>();
@@ -445,6 +449,7 @@ public class TmdbDetailActivity extends PlaybackActivity implements TrackDialog.
         personalDoubanItems.clear();
         personalAiItems.clear();
         if (service() != null) {
+            subtitlePlaybackSession.stop(this);
             player().stop();
             player().clear();
         }
@@ -3627,6 +3632,7 @@ public class TmdbDetailActivity extends PlaybackActivity implements TrackDialog.
     }
 
     private void stopInlinePlayerForReload() {
+        subtitlePlaybackSession.stop(this);
         inlineStartPosition = C.TIME_UNSET;
         inlineStartPositionApplied = false;
         pendingInlineResult = null;
@@ -3671,6 +3677,7 @@ public class TmdbDetailActivity extends PlaybackActivity implements TrackDialog.
         Site site = getCurrentSite();
         ensureInlineDanmakuController();
         startPlayer(getHistoryKey(), result, useParse, site == null ? 0 : site.getTimeout(), buildMetadata());
+        subtitlePlaybackSession.onPlaybackStarted(this, result);
         searchInlineDanmaku(result);
         binding.playerPanel.requestFocus();
     }
@@ -4266,7 +4273,7 @@ public class TmdbDetailActivity extends PlaybackActivity implements TrackDialog.
     private void showInlineQuality() {
         if (!canChangeInlineQuality()) return;
         if (!hasInlineUrlQuality()) {
-            TrackDialog.create().type(C.TRACK_TYPE_VIDEO).player(player()).show(this);
+            TrackDialog.create().type(C.TRACK_TYPE_VIDEO).player(player()).search(this::showSubtitleSearch).show(this);
             return;
         }
         int count = currentInlineResult.getUrl().getValues().size();
@@ -4406,7 +4413,7 @@ public class TmdbDetailActivity extends PlaybackActivity implements TrackDialog.
 
     private void showInlineTrack(View view) {
         if (service() == null || player().isEmpty()) return;
-        TrackDialog.create().type(Integer.parseInt(view.getTag().toString())).player(player()).show(this);
+        TrackDialog.create().type(Integer.parseInt(view.getTag().toString())).player(player()).search(this::showSubtitleSearch).show(this);
     }
 
     private boolean showInlineSubtitle() {
@@ -5288,6 +5295,7 @@ public class TmdbDetailActivity extends PlaybackActivity implements TrackDialog.
         inlinePlaybackGeneration++;
         inlinePlaybackLoading = false;
         introSkipPlayback.reset();
+        subtitlePlaybackSession.stop(this);
         hideInlineControls();
         if (service() != null) {
             player().stop();
@@ -5596,7 +5604,11 @@ public class TmdbDetailActivity extends PlaybackActivity implements TrackDialog.
 
     @Override
     public void onSubtitleClick() {
-        SubtitleDialog.create().view(binding.exo.getSubtitleView()).show(this);
+        SubtitleDialog.create().view(binding.exo.getSubtitleView()).search(this::showSubtitleSearch).show(this);
+    }
+
+    private void showSubtitleSearch() {
+        SubtitleManualSearchDialog.show(this, subtitlePlaybackSession, this);
     }
 
     @Override
@@ -5630,6 +5642,7 @@ public class TmdbDetailActivity extends PlaybackActivity implements TrackDialog.
 
     @Override
     protected void onDestroy() {
+        subtitlePlaybackSession.stop(this);
         if (inlinePiPLayout) exitInlinePiPLayout();
         if (inlineFullscreen) exitInlineFullscreen();
         cancelBackdropSlideRequest();
@@ -5640,6 +5653,46 @@ public class TmdbDetailActivity extends PlaybackActivity implements TrackDialog.
         if (inlineClock != null) inlineClock.release();
         DanmakuApi.cancel();
         super.onDestroy();
+    }
+
+    @Override
+    public String getSubtitlePlaybackKey() {
+        return getHistoryKey();
+    }
+
+    @Override
+    public Site getSubtitleSite() {
+        return getCurrentSite();
+    }
+
+    @Override
+    public Vod getSubtitleVod() {
+        return vod;
+    }
+
+    @Override
+    public Episode getSubtitleEpisode() {
+        return selectedEpisode;
+    }
+
+    @Override
+    public TmdbItem getSubtitleTmdbItem() {
+        return matchedTmdbItem == null ? initialTmdbItem : matchedTmdbItem;
+    }
+
+    @Override
+    public TmdbEpisode getSubtitleTmdbEpisode() {
+        return selectedEpisode == null ? null : selectedEpisode.getTmdbEpisode();
+    }
+
+    @Override
+    public PlayerManager getSubtitlePlayer() {
+        return player();
+    }
+
+    @Override
+    public boolean isSubtitleHostActive() {
+        return !isFinishing() && !isDestroyed() && service() != null && player() != null && !player().isReleased() && inlineStarted && currentInlineResult != null && isOwner();
     }
 
     @Override

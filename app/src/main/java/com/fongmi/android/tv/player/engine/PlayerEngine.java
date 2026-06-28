@@ -60,6 +60,10 @@ public interface PlayerEngine {
 
     void resetTrack();
 
+    default void resetTrack(int type) {
+        resetTrack();
+    }
+
     boolean haveTrack(int type);
 
     Tracks getCurrentTracks();

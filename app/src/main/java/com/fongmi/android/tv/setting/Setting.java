@@ -979,6 +979,30 @@ public class Setting {
         Prefers.put("play_back_to_detail", backToDetail);
     }
 
+    public static boolean isSubtitleAutoMatchEnabled() {
+        return Prefers.getBoolean("subtitle_auto_match", true);
+    }
+
+    public static void putSubtitleAutoMatchEnabled(boolean enabled) {
+        Prefers.put("subtitle_auto_match", enabled);
+    }
+
+    public static String getSubtitlePreferredLanguage() {
+        return Prefers.getString("subtitle_preferred_language", "zh");
+    }
+
+    public static void putSubtitlePreferredLanguage(String language) {
+        Prefers.put("subtitle_preferred_language", language == null || language.isEmpty() ? "zh" : language);
+    }
+
+    public static String getSubtitleAssrtToken() {
+        return Prefers.getString("subtitle_assrt_token");
+    }
+
+    public static void putSubtitleAssrtToken(String token) {
+        Prefers.put("subtitle_assrt_token", token);
+    }
+
     public static boolean isAutoSkipIntroOutro() {
         return Prefers.getBoolean("auto_skip_intro_outro", true);
     }

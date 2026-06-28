@@ -136,6 +136,7 @@
     <string name="setting_builtin_wall">內置壁紙</string>
     <string name="setting_player">播放設定</string>
     <string name="setting_danmaku">彈幕設定</string>
+    <string name="setting_subtitle">字幕設定</string>
     <string name="setting_enhance">增強功能</string>
     <string name="setting_search_thread">搜尋線程</string>
     <string name="setting_personal">個性設定</string>
@@ -804,6 +805,24 @@
     <string name="player_speed">長按倍速</string>
     <string name="player_ua">User-Agent</string>
     <string name="player_osd">屏顯設定</string>
+    <string name="player_subtitle_auto_match">自動匹配字幕</string>
+    <string name="player_subtitle_language">字幕偏好語言</string>
+    <string name="player_subtitle_assrt_token">ASSRT Token</string>
+    <string name="subtitle_auto_match_hit">已自動匹配字幕：%1$s</string>
+    <string name="subtitle_auto_match_hit_not_applied">已找到字幕但未套用：%1$s</string>
+    <string name="subtitle_auto_match_empty">未找到匹配字幕</string>
+    <string name="subtitle_auto_match_provider_unavailable">請先配置字幕源</string>
+    <string name="subtitle_auto_match_failed">字幕匹配失敗：%1$s</string>
+    <string name="subtitle_auto_match_unknown_reason">未知錯誤</string>
+    <string name="subtitle_manual_search">搜尋字幕</string>
+    <string name="subtitle_manual_searching">正在搜尋字幕...</string>
+    <string name="subtitle_manual_select_title">選擇字幕（%1$d）</string>
+    <string name="subtitle_manual_search_empty">未搜尋到字幕</string>
+    <string name="subtitle_manual_search_failed">字幕搜尋失敗</string>
+    <string name="subtitle_manual_resolving">正在載入字幕...</string>
+    <string name="subtitle_manual_applied">已套用字幕：%1$s</string>
+    <string name="subtitle_manual_apply_failed">已找到字幕但無法套用</string>
+    <string name="subtitle_manual_inactive">請先開始播放再搜尋字幕</string>
     <string name="lut_original">原色</string>
     <string name="lut_missing">預設不存在</string>
     <string name="lut_summary">%1$s · %2$d%%</string>
@@ -1012,6 +1031,26 @@
     <string-array name="select_caption">
         <item>預設</item>
         <item>系統</item>
+    </string-array>
+
+    <string-array name="select_subtitle_language">
+        <item>中文優先</item>
+        <item>簡體中文</item>
+        <item>繁體中文</item>
+        <item>英語</item>
+        <item>日語</item>
+        <item>韓語</item>
+        <item>不限制</item>
+    </string-array>
+
+    <string-array name="select_subtitle_language_value">
+        <item>zh</item>
+        <item>zh-Hans</item>
+        <item>zh-Hant</item>
+        <item>en</item>
+        <item>ja</item>
+        <item>ko</item>
+        <item>any</item>
     </string-array>
 
     <string-array name="select_player_osd">

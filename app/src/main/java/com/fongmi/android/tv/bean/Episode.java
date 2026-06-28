@@ -2,7 +2,6 @@ package com.fongmi.android.tv.bean;
 
 import android.os.Parcel;
 import android.os.Parcelable;
-import android.text.TextUtils;
 
 import androidx.annotation.Nullable;
 
@@ -55,7 +54,7 @@ public class Episode implements Parcelable, Diffable<Episode> {
     }
 
     public String getName() {
-        return TextUtils.isEmpty(name) ? "" : name;
+        return isEmpty(name) ? "" : name;
     }
 
     public void setName(String name) {
@@ -63,7 +62,7 @@ public class Episode implements Parcelable, Diffable<Episode> {
     }
 
     public String getDesc() {
-        return TextUtils.isEmpty(desc) ? "" : desc;
+        return isEmpty(desc) ? "" : desc;
     }
 
     public String getRawDisplayName() {
@@ -71,7 +70,7 @@ public class Episode implements Parcelable, Diffable<Episode> {
     }
 
     public String getDisplayName() {
-        return TextUtils.isEmpty(displayName) ? getRawDisplayName() : displayName;
+        return isEmpty(displayName) ? getRawDisplayName() : displayName;
     }
 
     public void setDisplayName(String displayName) {
@@ -79,7 +78,7 @@ public class Episode implements Parcelable, Diffable<Episode> {
     }
 
     public String getUrl() {
-        return TextUtils.isEmpty(url) ? "" : url;
+        return isEmpty(url) ? "" : url;
     }
 
     public int getIndex() {
@@ -129,8 +128,12 @@ public class Episode implements Parcelable, Diffable<Episode> {
 
     public boolean matches(Episode other) {
         if (other == null) return false;
-        if (!TextUtils.isEmpty(getUrl()) && !TextUtils.isEmpty(other.getUrl())) return getUrl().equals(other.getUrl());
+        if (!isEmpty(getUrl()) && !isEmpty(other.getUrl())) return getUrl().equals(other.getUrl());
         return matchesName(other);
+    }
+
+    private boolean isEmpty(String value) {
+        return value == null || value.length() == 0;
     }
 
     public Episode trans() {

@@ -91,6 +91,7 @@ import com.fongmi.android.tv.setting.PlayerButtonSetting;
 import com.fongmi.android.tv.setting.PlayerSetting;
 import com.fongmi.android.tv.setting.Setting;
 import com.fongmi.android.tv.setting.SiteHealthStore;
+import com.fongmi.android.tv.subtitle.SubtitlePlaybackSession;
 import com.fongmi.android.tv.ui.adapter.EpisodeAdapter;
 import com.fongmi.android.tv.ui.adapter.EpisodeGroupAdapter;
 import com.fongmi.android.tv.ui.adapter.FlagAdapter;
@@ -115,6 +116,7 @@ import com.fongmi.android.tv.ui.dialog.LutPanelDialog;
 import com.fongmi.android.tv.ui.dialog.QuickSearchDialog;
 import com.fongmi.android.tv.ui.dialog.ReceiveDialog;
 import com.fongmi.android.tv.ui.dialog.SubtitleDialog;
+import com.fongmi.android.tv.ui.dialog.SubtitleManualSearchDialog;
 import com.fongmi.android.tv.ui.dialog.TmdbSearchDialog;
 import com.fongmi.android.tv.ui.dialog.TitleDialog;
 import com.fongmi.android.tv.ui.dialog.TrackDialog;
@@ -153,7 +155,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-public class VideoActivity extends PlaybackActivity implements Clock.Callback, CustomKeyDown.Listener, TrackDialog.Listener, ControlDialog.Listener, FlagAdapter.OnClickListener, EpisodeAdapter.OnClickListener, EpisodeGroupAdapter.OnClickListener, QualityAdapter.OnClickListener, QuickAdapter.OnClickListener, ParseAdapter.OnClickListener, CastDialog.Listener, InfoDialog.Listener {
+public class VideoActivity extends PlaybackActivity implements Clock.Callback, CustomKeyDown.Listener, TrackDialog.Listener, ControlDialog.Listener, FlagAdapter.OnClickListener, EpisodeAdapter.OnClickListener, EpisodeGroupAdapter.OnClickListener, QualityAdapter.OnClickListener, QuickAdapter.OnClickListener, ParseAdapter.OnClickListener, CastDialog.Listener, InfoDialog.Listener, SubtitlePlaybackSession.Host {
 
     private static final int SHORT_DRAMA_SCALE = 4;
     private static final int SHORT_DRAMA_EDGE_MARGIN_DP = 12;
@@ -198,6 +200,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
     private FlagAdapter mFlagAdapter;
     private PlayerOsdController mOsd;
     private final IntroSkipPlayback mIntroSkipPlayback = new IntroSkipPlayback();
+    private final SubtitlePlaybackSession subtitlePlaybackSession = new SubtitlePlaybackSession(this);
     private ValueAnimator mAnimator;
     private CustomKeyDown mKeyDown;
     private List<String> mBroken;
@@ -1058,6 +1061,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
         mBinding.scroll.scrollTo(0, 0);
         mClock.setCallback(null);
         updateNavigationKey();
+        subtitlePlaybackSession.stop(this);
         player().reset();
         player().stop();
         saveHistory();
@@ -1376,6 +1380,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
         mBinding.control.parse.setVisibility(isUseParse() ? View.VISIBLE : View.GONE);
         if (redirectToAudioIfNeeded(result)) return;
         startPlayer(getHistoryKey(), result, isUseParse(), getSite().getTimeout(), buildMetadata());
+        subtitlePlaybackSession.onPlaybackStarted(this, result);
         if (DanmakuApi.canSearch()) DanmakuApi.search(mHistory.getVodName(), getEpisode().getName(), danmaku -> {
             if (DanmakuSetting.isSpiderFirst() && !result.getDanmaku().isEmpty()) player().addDanmaku(danmaku);
             else player().setDanmaku(danmaku);
@@ -1445,6 +1450,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
         updateActionQuality(result);
         beginPlayHealth();
         startPlayer(getHistoryKey(), result, isUseParse(), getSite().getTimeout(), buildMetadata());
+        subtitlePlaybackSession.onPlaybackStarted(this, result);
     }
 
     @Override
@@ -1872,13 +1878,13 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
     }
 
     private void onTrack(View view) {
-        TrackDialog.create().type(Integer.parseInt(view.getTag().toString())).player(player()).show(this);
+        TrackDialog.create().type(Integer.parseInt(view.getTag().toString())).player(player()).search(this::showSubtitleSearch).show(this);
         hideControl();
     }
 
     @Override
     public void onTrackPanel(int type) {
-        TrackDialog.create().type(type).player(player()).show(this);
+        TrackDialog.create().type(type).player(player()).search(this::showSubtitleSearch).show(this);
     }
 
     private void onTitle() {
@@ -2024,6 +2030,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
 
     private void onRefresh() {
         saveHistory();
+        subtitlePlaybackSession.stop(this);
         player().stop();
         player().clear();
         mClock.setCallback(null);
@@ -2709,6 +2716,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
     @Override
     protected void onError(String msg) {
         recordPlayHealth(false, msg);
+        subtitlePlaybackSession.stop(this);
         mBinding.swipeLayout.setEnabled(true);
         Track.delete(player().getKey());
         mClock.setCallback(null);
@@ -2786,8 +2794,12 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
 
     @Override
     public void onSubtitleClick() {
-        SubtitleDialog.create().view(mBinding.exo.getSubtitleView()).show(this);
+        SubtitleDialog.create().view(mBinding.exo.getSubtitleView()).search(() -> SubtitleManualSearchDialog.show(this, subtitlePlaybackSession, this)).show(this);
         hideControl();
+    }
+
+    private void showSubtitleSearch() {
+        SubtitleManualSearchDialog.show(this, subtitlePlaybackSession, this);
     }
 
     @Override
@@ -3784,6 +3796,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
 
     @Override
     public void onCasted() {
+        subtitlePlaybackSession.stop(this);
         player().stop();
     }
 
@@ -4031,6 +4044,7 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
 
     @Override
     protected void onDestroy() {
+        subtitlePlaybackSession.stop(this);
         mClock.release();
         saveHistory(true);
         Timer.get().reset();
@@ -4043,6 +4057,48 @@ public class VideoActivity extends PlaybackActivity implements Clock.Callback, C
         mViewModel.getSearch().removeObserver(mObserveSearch);
         SiteHealthStore.flush();
         super.onDestroy();
+    }
+
+    @Override
+    public String getSubtitlePlaybackKey() {
+        return getHistoryKey();
+    }
+
+    @Override
+    public Site getSubtitleSite() {
+        return getSite();
+    }
+
+    @Override
+    public Vod getSubtitleVod() {
+        return mVod;
+    }
+
+    @Override
+    public Episode getSubtitleEpisode() {
+        return getEpisode();
+    }
+
+    @Override
+    public TmdbItem getSubtitleTmdbItem() {
+        TmdbItem item = mTmdbUIAdapter == null ? null : mTmdbUIAdapter.getTmdbItem();
+        return item == null ? getTmdbItem() : item;
+    }
+
+    @Override
+    public TmdbEpisode getSubtitleTmdbEpisode() {
+        Episode episode = getEpisode();
+        return episode == null ? null : episode.getTmdbEpisode();
+    }
+
+    @Override
+    public PlayerManager getSubtitlePlayer() {
+        return player();
+    }
+
+    @Override
+    public boolean isSubtitleHostActive() {
+        return !isFinishing() && !isDestroyed() && service() != null && player() != null && !player().isReleased() && !player().isEmpty() && isOwner();
     }
 
     private static class ShortDramaControlItem {

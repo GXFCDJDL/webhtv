@@ -79,6 +79,7 @@ import com.fongmi.android.tv.setting.PlayerButtonSetting;
 import com.fongmi.android.tv.setting.PlayerSetting;
 import com.fongmi.android.tv.setting.Setting;
 import com.fongmi.android.tv.setting.SiteHealthStore;
+import com.fongmi.android.tv.subtitle.SubtitlePlaybackSession;
 import com.fongmi.android.tv.ui.adapter.ArrayAdapter;
 import com.fongmi.android.tv.ui.adapter.BackdropAdapter;
 import com.fongmi.android.tv.ui.adapter.EpisodeAdapter;
@@ -93,9 +94,10 @@ import com.fongmi.android.tv.ui.custom.CustomSeekView;
 import com.fongmi.android.tv.ui.custom.PlayerOsdController;
 import com.fongmi.android.tv.ui.dialog.ContentDialog;
 import com.fongmi.android.tv.ui.dialog.DanmakuDialog;
-import com.fongmi.android.tv.ui.dialog.EpisodeDialog;
+import com.fongmi.android.tv.ui.dialog.EpisodeListDialog;
 import com.fongmi.android.tv.ui.dialog.QuickSearchDialog;
 import com.fongmi.android.tv.ui.dialog.SubtitleDialog;
+import com.fongmi.android.tv.ui.dialog.SubtitleManualSearchDialog;
 import com.fongmi.android.tv.ui.dialog.TmdbSearchDialog;
 import com.fongmi.android.tv.ui.dialog.TitleDialog;
 import com.fongmi.android.tv.ui.dialog.TrackDialog;
@@ -131,7 +133,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.Listener, TrackDialog.Listener, ArrayAdapter.OnClickListener, FlagAdapter.OnClickListener, EpisodeAdapter.OnClickListener, QualityAdapter.OnClickListener, QuickAdapter.OnClickListener, ParseAdapter.OnClickListener, Clock.Callback {
+public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.Listener, TrackDialog.Listener, ArrayAdapter.OnClickListener, FlagAdapter.OnClickListener, EpisodeAdapter.OnClickListener, QualityAdapter.OnClickListener, QuickAdapter.OnClickListener, ParseAdapter.OnClickListener, Clock.Callback, SubtitlePlaybackSession.Host {
 
     private static final int SHORT_DRAMA_SCALE = 0; // 0=原始(适合TV), 4=裁剪(适合手机)
     private static final int TMDB_DETAIL_LOAD_TIMEOUT = 8000;
@@ -161,6 +163,7 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
     private QuickSearchDialog mQuickSearchDialog;
     private PlayerOsdController mOsd;
     private final IntroSkipPlayback mIntroSkipPlayback = new IntroSkipPlayback();
+    private final SubtitlePlaybackSession subtitlePlaybackSession = new SubtitlePlaybackSession(this);
     private CustomKeyDownVod mKeyDown;
     private SiteViewModel mViewModel;
     private List<String> mBroken;
@@ -825,6 +828,7 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
         mActionButtons = new HashMap<>();
         addActionButton(PlayerButtonSetting.NEXT, mBinding.control.action.next);
         addActionButton(PlayerButtonSetting.PREV, mBinding.control.action.prev);
+        addActionButton(PlayerButtonSetting.EPISODES, mBinding.control.action.episodes);
         addActionButton(PlayerButtonSetting.RESET, mBinding.control.action.reset);
         addActionButton(PlayerButtonSetting.CHANGE, mBinding.control.action.change2);
         addActionButton(PlayerButtonSetting.FULLSCREEN, mBinding.control.action.fullscreen);
@@ -1000,6 +1004,7 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
         mBinding.scroll.scrollTo(0, 0);
         mClock.setCallback(null);
         updateNavigationKey();
+        subtitlePlaybackSession.stop(this);
         player().reset();
         player().stop();
         saveHistory();
@@ -1252,6 +1257,7 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
         mBinding.control.parse.setVisibility(isUseParse() ? View.VISIBLE : View.GONE);
         if (redirectToContentHandler(result)) return;
         startPlayer(getHistoryKey(), result, isUseParse(), getSite().getTimeout(), buildMetadata());
+        subtitlePlaybackSession.onPlaybackStarted(this, result);
         if (DanmakuApi.canSearch()) DanmakuApi.search(mHistory.getVodName(), getEpisode().getName(), danmaku -> {
             if (DanmakuSetting.isSpiderFirst() && !result.getDanmaku().isEmpty()) player().addDanmaku(danmaku);
             else player().setDanmaku(danmaku);
@@ -1322,6 +1328,7 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
         updateEpisodeFallbackStillUrl();
         mEpisodeAdapter.setUseTmdbCard(useTmdbCards);
         mEpisodeGridAdapter.setUseTmdbCard(useTmdbCards);
+        applyActionButtonVisibility();
         mEpisodeAdapter.addAll(items);
         mEpisodeGridAdapter.addAll(items);
 
@@ -1458,6 +1465,7 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
         updateActionQuality(result);
         beginPlayHealth();
         startPlayer(getHistoryKey(), result, isUseParse(), getSite().getTimeout(), buildMetadata());
+        subtitlePlaybackSession.onPlaybackStarted(this, result);
     }
 
     private void reverseEpisode(boolean scroll) {
@@ -1806,6 +1814,12 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
         showControl(exit ? mBinding.control.action.fullscreen : mBinding.control.action.player);
     }
 
+    private void onEpisodes() {
+        if (mFlagAdapter.getItemCount() == 0 || mEpisodeAdapter.getItemCount() < 2) return;
+        hideControl();
+        EpisodeListDialog.create().flags(mFlagAdapter.getItems()).show(this);
+    }
+
     private void onRepeat() {
         player().setRepeatOne(!player().isRepeatOne());
         mBinding.control.action.repeat.setSelected(player().isRepeatOne());
@@ -2004,6 +2018,7 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
 
     private void onRefresh() {
         saveHistory();
+        subtitlePlaybackSession.stop(this);
         player().stop();
         player().clear();
         mClock.setCallback(null);
@@ -2099,7 +2114,7 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
     }
 
     private void onTrack(View view) {
-        TrackDialog.create().type(Integer.parseInt(view.getTag().toString())).player(player()).show(this);
+        TrackDialog.create().type(Integer.parseInt(view.getTag().toString())).player(player()).search(this::showSubtitleSearch).show(this);
         hideControl();
     }
 
@@ -2116,11 +2131,6 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
     private void onToggle() {
         if (isVisible(mBinding.control.getRoot())) hideControl();
         else showControl(getFocus2());
-    }
-
-    private void onEpisodes() {
-        if (mEpisodeAdapter == null || mEpisodeAdapter.getItemCount() == 0) return;
-        EpisodeDialog.create().episodes(mEpisodeAdapter.getItems()).reverseAction(this::onRevSort).show(this);
     }
 
     private void showProgress() {
@@ -2590,6 +2600,7 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
     @Override
     protected void onError(String msg) {
         recordPlayHealth(false, msg);
+        subtitlePlaybackSession.stop(this);
         Track.delete(player().getKey());
         mClock.setCallback(null);
         player().resetTrack();
@@ -2649,8 +2660,12 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
 
     @Override
     public void onSubtitleClick() {
-        SubtitleDialog.create().view(mBinding.exo.getSubtitleView()).show(this);
+        SubtitleDialog.create().view(mBinding.exo.getSubtitleView()).search(() -> SubtitleManualSearchDialog.show(this, subtitlePlaybackSession, this)).show(this);
         App.post(this::hideControl, 100);
+    }
+
+    private void showSubtitleSearch() {
+        SubtitleManualSearchDialog.show(this, subtitlePlaybackSession, this);
     }
 
     @Override
@@ -4170,7 +4185,10 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
     protected void onStart() {
         super.onStart();
         mClock.stop().start();
-        if (mOsd != null) mOsd.start();
+        if (mOsd != null) {
+            mOsd.setDiagnosticsVisible(PlayerSetting.isOsdDiagnostics());
+            mOsd.start();
+        }
     }
 
     @Override
@@ -4199,6 +4217,7 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
 
     @Override
     protected void onDestroy() {
+        subtitlePlaybackSession.stop(this);
         mClock.release();
         saveHistory(true);
         DanmakuApi.cancel();
@@ -4214,5 +4233,47 @@ public class VideoActivity extends PlaybackActivity implements CustomKeyDownVod.
         mViewModel.getSearchProgress().removeObserver(mObserveSearchProgress);
         SiteHealthStore.flush();
         super.onDestroy();
+    }
+
+    @Override
+    public String getSubtitlePlaybackKey() {
+        return getHistoryKey();
+    }
+
+    @Override
+    public Site getSubtitleSite() {
+        return getSite();
+    }
+
+    @Override
+    public Vod getSubtitleVod() {
+        return mVod;
+    }
+
+    @Override
+    public Episode getSubtitleEpisode() {
+        return getEpisode();
+    }
+
+    @Override
+    public TmdbItem getSubtitleTmdbItem() {
+        TmdbItem item = mTmdbUIAdapter == null ? null : mTmdbUIAdapter.getTmdbItem();
+        return item == null ? getTmdbItem() : item;
+    }
+
+    @Override
+    public TmdbEpisode getSubtitleTmdbEpisode() {
+        Episode episode = getEpisode();
+        return episode == null ? null : episode.getTmdbEpisode();
+    }
+
+    @Override
+    public PlayerManager getSubtitlePlayer() {
+        return player();
+    }
+
+    @Override
+    public boolean isSubtitleHostActive() {
+        return !isFinishing() && !isDestroyed() && service() != null && player() != null && !player().isReleased() && !player().isEmpty() && isOwner();
     }
 }

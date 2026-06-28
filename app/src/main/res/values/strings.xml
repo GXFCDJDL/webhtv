@@ -138,6 +138,7 @@
     <string name="setting_builtin_wall">Built-in wallpapers</string>
     <string name="setting_player">Player setting</string>
     <string name="setting_danmaku">Danmaku setting</string>
+    <string name="setting_subtitle">Subtitle setting</string>
     <string name="setting_enhance">Enhancements</string>
     <string name="setting_personal">Personal</string>
     <string name="setting_home_vod_auto_load">Auto-load VOD</string>
@@ -827,6 +828,24 @@
     <string name="player_speed">Press speed</string>
     <string name="player_ua">User-Agent</string>
     <string name="player_osd">On-screen display</string>
+    <string name="player_subtitle_auto_match">Auto subtitle match</string>
+    <string name="player_subtitle_language">Preferred subtitle language</string>
+    <string name="player_subtitle_assrt_token">ASSRT token</string>
+    <string name="subtitle_auto_match_hit">Subtitle matched: %1$s</string>
+    <string name="subtitle_auto_match_hit_not_applied">Subtitle found but not applied: %1$s</string>
+    <string name="subtitle_auto_match_empty">No matching subtitle found</string>
+    <string name="subtitle_auto_match_provider_unavailable">Configure a subtitle source first</string>
+    <string name="subtitle_auto_match_failed">Subtitle match failed: %1$s</string>
+    <string name="subtitle_auto_match_unknown_reason">unknown error</string>
+    <string name="subtitle_manual_search">Search subtitles</string>
+    <string name="subtitle_manual_searching">Searching subtitles...</string>
+    <string name="subtitle_manual_select_title">Select subtitle (%1$d)</string>
+    <string name="subtitle_manual_search_empty">No subtitles found</string>
+    <string name="subtitle_manual_search_failed">Subtitle search failed</string>
+    <string name="subtitle_manual_resolving">Loading subtitle...</string>
+    <string name="subtitle_manual_applied">Subtitle applied: %1$s</string>
+    <string name="subtitle_manual_apply_failed">Subtitle found but could not be applied</string>
+    <string name="subtitle_manual_inactive">Start playback before searching subtitles</string>
     <string name="lut_original">Original</string>
     <string name="lut_missing">Preset missing</string>
     <string name="lut_summary">%1$s · %2$d%%</string>
@@ -1101,6 +1120,26 @@
     <string-array name="select_caption">
         <item>Default</item>
         <item>System</item>
+    </string-array>
+
+    <string-array name="select_subtitle_language">
+        <item>Chinese first</item>
+        <item>Simplified Chinese</item>
+        <item>Traditional Chinese</item>
+        <item>English</item>
+        <item>Japanese</item>
+        <item>Korean</item>
+        <item>No preference</item>
+    </string-array>
+
+    <string-array name="select_subtitle_language_value">
+        <item>zh</item>
+        <item>zh-Hans</item>
+        <item>zh-Hant</item>
+        <item>en</item>
+        <item>ja</item>
+        <item>ko</item>
+        <item>any</item>
     </string-array>
 
     <string-array name="select_player_osd">

@@ -325,4 +325,5 @@ public class SettingPlayerActivity extends BaseActivity implements UaListener, B
         PlayerSetting.putBackground(PlayerSetting.isBackgroundOn() ? 0 : 1);
         mBinding.backgroundText.setText(getSwitch(PlayerSetting.isBackgroundOn()));
     }
+
 }
